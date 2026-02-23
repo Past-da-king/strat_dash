@@ -10,7 +10,7 @@ import styles
 st.set_page_config(page_title="PM Tool - Project Setup", layout="wide")
 
 def project_setup_page():
-    auth.require_role(['pm', 'admin'])
+    auth.require_role(['pm', 'admin', 'executive'])
     styles.global_css()
     st.markdown("""
     <div style="background: linear-gradient(135deg, #2c5aa0 0%, #5fa2e8 100%); color: white; padding: 1.5rem 2rem; border-radius: 12px; margin-bottom: 2rem; box-shadow: 0 4px 12px rgba(44, 90, 160, 0.2);">

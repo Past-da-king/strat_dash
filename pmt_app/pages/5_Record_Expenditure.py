@@ -9,7 +9,7 @@ import styles
 st.set_page_config(page_title="PM Tool - Record Expenditure", layout="wide")
 
 def record_exp_page():
-    auth.require_role(['recorder', 'pm', 'admin'])
+    auth.require_role(['recorder', 'pm', 'admin', 'executive'])
     styles.global_css()
     
     st.markdown("""

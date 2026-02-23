@@ -9,7 +9,7 @@ from werkzeug.security import generate_password_hash
 st.set_page_config(page_title="PM Tool - Admin Panel", layout="wide")
 
 def admin_panel():
-    auth.require_role(['admin'])
+    auth.require_role(['admin', 'executive'])
     styles.global_css()
     
     st.markdown("""

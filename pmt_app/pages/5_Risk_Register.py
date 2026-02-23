@@ -9,7 +9,7 @@ import styles
 st.set_page_config(page_title="PM Tool - Risk Register", layout="wide")
 
 def risk_register_page():
-    auth.require_role(['recorder', 'pm', 'admin'])
+    auth.require_role(['recorder', 'pm', 'admin', 'executive'])
     styles.global_css()
     
     st.markdown("""

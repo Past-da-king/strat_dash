@@ -15,7 +15,7 @@ if not os.path.exists(UPLOADS_DIR):
     UPLOADS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'uploads')
 
 def record_activity_page():
-    auth.require_role(['recorder', 'pm', 'admin'])
+    auth.require_role(['recorder', 'pm', 'admin', 'executive'])
     styles.global_css()
     
     st.markdown("""
