@@ -217,7 +217,13 @@ def record_activity_page():
                     if st.button("✅ Complete", key=f"btn_{row['activity_id']}", use_container_width=True, type="primary"):
                         complete_task_dialog(row['activity_id'], row['activity_name'], row.get('expected_output'))
                 else:
-                    st.button("✓ Done", disabled=True, key=f"btn_{row['activity_id']}", use_container_width=True)
+                    is_privileged = current_user['role'] in ['admin', 'pm', 'executive']
+                    if is_privileged:
+                        if st.button("🔄 Reopen Task", key=f"btn_{row['activity_id']}", use_container_width=True):
+                            database.update_activity_status(row['activity_id'], 'Active', current_user['id'])
+                            st.rerun()
+                    else:
+                        st.button("✓ Done", disabled=True, key=f"btn_{row['activity_id']}", use_container_width=True)
         
         st.markdown('<div style="height:10px;"></div>', unsafe_allow_html=True)
 
