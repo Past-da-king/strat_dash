@@ -12,6 +12,21 @@ def global_css():
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
         @import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css');
 
+        /* --- Sidebar Hiding Logic --- */
+        #root:has(.hide-sidebar) [data-testid="stSidebar"] {
+            display: none !important;
+        }
+
+        .stApp:has(.hide-sidebar) [data-testid="stSidebarNav"] {
+            display: none !important;
+        }
+
+        /* --- Icon & Utility Classes --- */
+        .fa-icon {
+            margin-right: 8px;
+            color: var(--primary-light);
+        }
+
         /* --- Root Variables (Theme-Aware) --- */
         :root {{
             --primary-color: #2c5aa0;

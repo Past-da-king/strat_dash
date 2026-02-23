@@ -34,8 +34,11 @@ def main():
     """, unsafe_allow_html=True)
 
     if not auth.is_logged_in():
+        # Inject trigger to hide sidebar at login
+        st.markdown('<div class="hide-sidebar"></div>', unsafe_allow_html=True)
+        
         # Tabs for Login/Signup
-        tab_login, tab_signup = st.tabs(["🔑 LOGIN", "📝 REGISTER"])
+        tab_login, tab_signup = st.tabs(["<i class='fas fa-key fa-icon'></i> LOGIN", "<i class='fas fa-user-plus fa-icon'></i> REGISTER"])
         
         with tab_login:
             with st.form("login_form", clear_on_submit=False):
@@ -58,7 +61,7 @@ def main():
                 new_user = st.text_input("Username *")
                 new_pass = st.text_input("Password *", type="password")
                 new_name = st.text_input("Full Name *")
-                new_role = st.selectbox("Requested Role", ["pm", "executive", "recorder"])
+                new_role = st.selectbox("Requested Role", ["pm", "executive", "team"])
                 
                 signup_submit = st.form_submit_button("REGISTER")
                 
@@ -113,13 +116,13 @@ def main():
         
         c1, c2, c3 = st.columns(3)
         with c1:
-            if st.button("📊 Executive Overview", use_container_width=True):
+            if st.button("<i class='fas fa-chart-line fa-icon'></i> Executive Overview", use_container_width=True):
                 st.switch_page("pages/1_Executive_Dashboard.py")
         with c2:
-            if st.button("🏠 Project Management", use_container_width=True):
+            if st.button("<i class='fas fa-tasks fa-icon'></i> Project Management", use_container_width=True):
                 st.switch_page("pages/2_PM_Dashboard.py")
         with c3:
-            if st.button("🚪 Logout", type="primary", use_container_width=True):
+            if st.button("<i class='fas fa-sign-out-alt fa-icon'></i> Logout", type="primary", use_container_width=True):
                 auth.logout()
                 st.rerun()
 

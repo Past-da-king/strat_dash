@@ -15,7 +15,7 @@ if not os.path.exists(UPLOADS_DIR):
     UPLOADS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'uploads')
 
 def record_activity_page():
-    auth.require_role(['recorder', 'pm', 'admin', 'executive'])
+    auth.require_role(['team', 'pm', 'admin', 'executive'])
     styles.global_css()
     
     st.markdown("""
@@ -64,7 +64,12 @@ def record_activity_page():
     </style>
     """, unsafe_allow_html=True)
     
-    st.title("⚡ Activity Status Management")
+    st.markdown("""
+        <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 0.5rem;">
+            <i class="fas fa-bolt" style="font-size: 2rem; color: #fbbf24;"></i>
+            <h1 style="margin: 0;">Activity Status Management</h1>
+        </div>
+    """, unsafe_allow_html=True)
     st.markdown("Update the current progress of project phases. *Strict dependency rules apply.*")
     
     # 1. Fetch Projects (RBAC)
@@ -92,18 +97,16 @@ def record_activity_page():
     activities = database.get_baseline_schedule(project_id, user_id_filter=task_user_filter)
     
     if activities is None or activities.empty:
-        st.warning("⚠️ No activities found for you in this project.")
+        st.warning("<i class='fas fa-exclamation-triangle fa-icon'></i> No activities found for you in this project.")
         st.stop()
     
     st.divider()
     
     # --- Completion Dialog ---
-    @st.dialog("✅ Complete Task", width="large")
-    def complete_task_dialog(activity_id, activity_name, expected_output):
-        st.markdown(f"### Completing: **{activity_name}**")
+        st.markdown(f"### <i class='fas fa-check-circle fa-icon'></i> Completing: **{activity_name}**")
         
         if expected_output:
-            st.info(f"📋 **Expected Output:** {expected_output}")
+            st.info(f"<i class='fas fa-clipboard-list fa-icon'></i> **Expected Output:** {expected_output}")
         
         st.markdown("---")
         st.markdown("**Please upload the deliverable file associated with this task:**")
@@ -176,9 +179,9 @@ def record_activity_page():
                 
                 badges_html = f'<div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:8px;">'
                 if row.get('responsible_name'):
-                    badges_html += f'<span class="badge badge-user">👤 {row["responsible_name"]}</span>'
+                    badges_html += f'<span class="badge badge-user"><i class="fas fa-user-circle"></i> {row["responsible_name"]}</span>'
                 if row.get('expected_output'):
-                    badges_html += f'<span class="badge badge-output">📋 {row["expected_output"]}</span>'
+                    badges_html += f'<span class="badge badge-output"><i class="fas fa-clipboard-list"></i> {row["expected_output"]}</span>'
                 badges_html += '</div>'
                 st.markdown(badges_html, unsafe_allow_html=True)
             
@@ -228,7 +231,7 @@ def record_activity_page():
         st.markdown('<div style="height:10px;"></div>', unsafe_allow_html=True)
 
     # Activity Audit Log
-    with st.expander("📜 Activity Audit Log (History)"):
+    with st.expander("<i class='fas fa-history fa-icon'></i> Activity Audit Log (History)"):
         logs = database.get_df('''
             SELECT al.event_type, al.event_date, bs.activity_name, u.full_name as recorded_by
             FROM activity_log al

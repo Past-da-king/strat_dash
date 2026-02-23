@@ -9,19 +9,22 @@ import styles
 st.set_page_config(page_title="PM Tool - Record Expenditure", layout="wide")
 
 def record_exp_page():
-    auth.require_role(['recorder', 'pm', 'admin', 'executive'])
+    auth.require_role(['team', 'pm', 'admin', 'executive'])
     styles.global_css()
     
     st.markdown("""
     <div style="background: linear-gradient(135deg, #2c5aa0 0%, #5fa2e8 100%); color: white; padding: 1.5rem 2rem; border-radius: 12px; margin-bottom: 1.5rem; box-shadow: 0 4px 12px rgba(44, 90, 160, 0.2);">
-        <div style="font-size: 1.6rem; font-weight: 700;">💰 Record Expenditure</div>
-        <div style="font-size: 0.85rem; opacity: 0.9;">Log project costs against activities</div>
+        <div style="display: flex; align-items: center; gap: 12px;">
+            <i class="fas fa-money-bill-wave" style="font-size: 1.6rem;"></i>
+            <div style="font-size: 1.6rem; font-weight: 700;">Record Expenditure</div>
+        </div>
+        <div style="font-size: 0.85rem; opacity: 0.9; margin-left: 36px;">Log project costs against activities</div>
     </div>
     """, unsafe_allow_html=True)
     
     # 1. Fetch Projects (RBAC)
     current_user = auth.get_current_user()
-    is_global_role = current_user['role'] in ['admin', 'executive', 'recorder']
+    is_global_role = current_user['role'] in ['admin', 'executive', 'team']
     
     # If not global role, filter projects where they are assigned (either as PM or team)
     user_id_filter = None if is_global_role else current_user['id']
@@ -63,7 +66,7 @@ def record_exp_page():
             reference = st.text_input("Reference (Invoice / PO) *")
             description = st.text_area("Description")
         
-        submit = st.form_submit_button("💾 Log Expenditure")
+        submit = st.form_submit_button("<i class='fas fa-save fa-icon'></i> Log Expenditure")
         
         if submit:
             if not reference:
@@ -80,7 +83,7 @@ def record_exp_page():
                         'spend_date': spend_date.strftime('%Y-%m-%d')
                     }
                     database.add_expenditure(data, auth.get_current_user()['id'])
-                    st.success(f"✅ Successfully logged R {amount:,.2f} for {category}")
+                    st.success(f"<i class='fas fa-check-circle fa-icon'></i> Successfully logged R {amount:,.2f} for {category}")
                 except Exception as e:
                     st.error(f"Error logging expenditure: {e}")
 
@@ -92,7 +95,7 @@ def record_exp_page():
     total_val = current_exps['total'].iloc[0] if not current_exps.empty and current_exps['total'].iloc[0] else 0.0
     st.metric(label="Total Recorded Expenditure (Current Project)", value=f"R {total_val:,.2f}")
 
-    st.subheader("📋 Full Transaction History")
+    st.subheader("Full Transaction History")
     exps = database.get_df('''
         SELECT el.spend_date, el.category, el.amount, el.reference_id, el.description, u.full_name as recorded_by
         FROM expenditure_log el
