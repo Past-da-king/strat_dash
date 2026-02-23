@@ -1,0 +1,9 @@
+streamlit
+pandas
+werkzeug
+openpyxl
+plotly
+matplotlib
+seaborn
+reportlab
+pdfrw
