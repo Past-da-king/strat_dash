@@ -3,13 +3,14 @@ import database
 import auth
 import styles
 import os
+import base64
 from pathlib import Path
 
-# Portable logo path — image lives in pmt_app/image/image.png
+# Portable logo — encoded as base64 data URI for platform-independent HTML embedding
 LOGO_PATH = Path(__file__).parent / "image" / "image.png"
-# Read as bytes for reliable rendering on any platform or host
 with open(LOGO_PATH, "rb") as _f:
     LOGO_BYTES = _f.read()
+LOGO_B64 = base64.b64encode(LOGO_BYTES).decode()
 
 # Page Config (Set this first)
 st.set_page_config(
@@ -72,21 +73,17 @@ def login_view():
     col_space1, col_form, col_space2 = st.columns([1.5, 2, 1.5])
 
     with col_form:
-        # --- COMPACT HEADER: small logo + company name side by side ---
-        h_left, h_logo, h_text, h_right = st.columns([1, 1, 3, 1])
-        with h_logo:
-            st.image(LOGO_BYTES, width=55)
-        with h_text:
-            st.markdown("""
-                <div style="display: flex; flex-direction: column; justify-content: center; height: 100%; padding-top: 8px;">
-                    <div style="color: white; font-size: 1.3rem; font-weight: 800; letter-spacing: -0.5px; line-height: 1.1;">STRAT EDGE</div>
-                    <div style="color: #38bdf8; font-size: 0.65rem; font-weight: 600; letter-spacing: 3px; margin-top: 3px;">PROJECT PORTAL</div>
+        # --- COMPACT HEADER using base64 inline image ---
+        st.markdown(f"""
+            <div style="display: flex; align-items: center; justify-content: center; gap: 12px; margin-bottom: 8px;">
+                <img src="data:image/png;base64,{LOGO_B64}" width="52" style="flex-shrink: 0;" />
+                <div>
+                    <div style="color: white; font-size: 1.4rem; font-weight: 800; letter-spacing: -0.5px; line-height: 1.1;">STRAT EDGE</div>
+                    <div style="color: #38bdf8; font-size: 0.65rem; font-weight: 700; letter-spacing: 3px; margin-top: 2px;">PROJECT PORTAL</div>
                 </div>
-            """, unsafe_allow_html=True)
-
-        st.markdown("""
-            <div style="text-align: center; color: #64748b; font-size: 0.72rem; font-style: italic; margin-top: 4px; margin-bottom: 18px; opacity: 0.85;">
-                "Turning Insight into Advantage"
+            </div>
+            <div style="text-align: center; color: #64748b; font-size: 0.72rem; font-style: italic; margin-bottom: 20px;">
+                &ldquo;Turning Insight into Advantage&rdquo;
             </div>
         """, unsafe_allow_html=True)
 
