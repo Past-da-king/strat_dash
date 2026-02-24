@@ -8,7 +8,7 @@ import styles
 import pdf_generator
 
 # Page Config
-st.set_page_config(page_title="PM Tool - Executive Dashboard", page_icon="📊", layout="wide")
+st.set_page_config(page_title="PM Tool - Executive Dashboard", layout="wide")
 
 def executive_dashboard():
     auth.require_role(['admin', 'executive'])
@@ -17,8 +17,11 @@ def executive_dashboard():
     # --- Header ---
     st.markdown("""
     <div style="background: linear-gradient(135deg, #2c5aa0 0%, #5fa2e8 100%); color: white; padding: 2rem; border-radius: 12px; margin-bottom: 2rem; box-shadow: 0 4px 12px rgba(44, 90, 160, 0.2);">
-        <div style="font-size: 2.2rem; font-weight: 700; letter-spacing: -0.5px;">PORTFOLIO OVERVIEW</div>
-        <div style="font-size: 0.95rem; opacity: 0.9; margin-top: 0.5rem;">All active projects at a glance</div>
+        <div style="display: flex; align-items: center; gap: 15px;">
+            <i class="fas fa-chart-pie" style="font-size: 2.2rem;"></i>
+            <div style="font-size: 2.2rem; font-weight: 700; letter-spacing: -0.5px;">PORTFOLIO OVERVIEW</div>
+        </div>
+        <div style="font-size: 0.95rem; opacity: 0.9; margin-top: 0.5rem; margin-left: 50px;">All active projects at a glance</div>
     </div>
     """, unsafe_allow_html=True)
     
@@ -52,7 +55,7 @@ def executive_dashboard():
     st.markdown("---")
     
     # --- Project Cards ---
-    st.subheader("📁 Project Detail Cards")
+    st.subheader("Project Detail Cards")
     
     cols_per_row = 2
     for i in range(0, len(all_metrics), cols_per_row):
@@ -104,24 +107,30 @@ def executive_dashboard():
                 # Action buttons positioned below the custom card (Streamlit Native for functionality)
                 btn_col1, btn_col2 = st.columns(2)
                 with btn_col1:
-                    if st.button(f"📊 Dashboard", key=f"view_{m['project_id']}", use_container_width=True):
+                    st.markdown('<div class="pm-btn">', unsafe_allow_html=True)
+                    if st.button("Dashboard", key=f"view_{m['project_id']}", use_container_width=True):
                         st.session_state['selected_project'] = m['project_number']
-                        st.switch_page("pages/2_PM_Dashboard.py")
+                        st.switch_page("views/2_PM_Dashboard.py")
+                    st.markdown('</div>', unsafe_allow_html=True)
                 with btn_col2:
-                    if st.button(f"📄 Report", key=f"pdf_{m['project_id']}", use_container_width=True):
+                    st.markdown('<div class="report-btn">', unsafe_allow_html=True) 
+                    if st.button("Report", key=f"pdf_{m['project_id']}", use_container_width=True):
                         try:
                             pdf_gen = pdf_generator.PDFReportGenerator(m['project_id'])
                             pdf_bytes = pdf_gen.generate()
+                            st.markdown('<div class="download-btn">', unsafe_allow_html=True)
                             st.download_button(
-                                "📥 Download",
+                                "Download",
                                 data=pdf_bytes,
                                 file_name=f"Report_{m['project_number']}.pdf",
                                 mime="application/pdf",
                                 key=f"dl_pdf_{m['project_id']}",
                                 use_container_width=True
                             )
+                            st.markdown('</div>', unsafe_allow_html=True)
                         except Exception as e:
                             st.error(f"Error: {e}")
+                    st.markdown('</div>', unsafe_allow_html=True)
                 
                 st.markdown('<div style="margin-bottom:2rem;"></div>', unsafe_allow_html=True)
 

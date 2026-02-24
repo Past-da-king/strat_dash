@@ -2,30 +2,29 @@ import streamlit as st
 
 def global_css():
     """Inject theme-aware premium global CSS into the Streamlit application."""
+    # Inject external assets via HTML link tags for better reliability
+    st.markdown("""
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap">
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+    """, unsafe_allow_html=True)
+
     st.markdown(f"""
     <style>
-        /* ========================================
-           GLOBAL DESIGN SYSTEM - PM TOOL v2.1
-           ======================================== */
-
-        /* --- Font Import --- */
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-        @import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css');
 
         /* --- Sidebar Hiding Logic --- */
-        #root:has(.hide-sidebar) [data-testid="stSidebar"] {
+        #root:has(.hide-sidebar) [data-testid="stSidebar"] {{
             display: none !important;
-        }
+        }}
 
-        .stApp:has(.hide-sidebar) [data-testid="stSidebarNav"] {
+        .stApp:has(.hide-sidebar) [data-testid="stSidebarNav"] {{
             display: none !important;
-        }
+        }}
 
         /* --- Icon & Utility Classes --- */
-        .fa-icon {
+        .fa-icon {{
             margin-right: 8px;
             color: var(--primary-light);
-        }
+        }}
 
         /* --- Root Variables (Theme-Aware) --- */
         :root {{
@@ -142,6 +141,37 @@ def global_css():
             color: var(--primary-light) !important;
             border-bottom: 3px solid var(--primary-light) !important;
         }}
+
+        /* --- Tab Icon Injection (FontAwesome via CSS) --- */
+        [data-testid="stTitleBlock"] + div .stTabs [data-baseweb="tab"]:nth-child(1) div:before {{
+            content: "\\f084"; font-family: "Font Awesome 6 Free"; font-weight: 900; margin-right: 8px;
+        }}
+        [data-testid="stTitleBlock"] + div .stTabs [data-baseweb="tab"]:nth-child(2) div:before {{
+            content: "\\f234"; font-family: "Font Awesome 6 Free"; font-weight: 900; margin-right: 8px;
+        }}
+
+        /* --- Action Button Icons (FontAwesome via CSS) --- */
+        /* Targeting multiple possible Streamlit button DOM structures */
+        .exec-btn button [data-testid="stMarkdownContainer"] p:before {{ content: "\\f201"; font-family: "Font Awesome 6 Free"; font-weight: 900; margin-right: 8px; }}
+        .pm-btn button [data-testid="stMarkdownContainer"] p:before {{ content: "\\f0ae"; font-family: "Font Awesome 6 Free"; font-weight: 900; margin-right: 8px; }}
+        .logout-btn button [data-testid="stMarkdownContainer"] p:before {{ content: "\\f2f5"; font-family: "Font Awesome 6 Free"; font-weight: 900; margin-right: 8px; }}
+        .add-btn button [data-testid="stMarkdownContainer"] p:before {{ content: "\\f0fe"; font-family: "Font Awesome 6 Free"; font-weight: 900; margin-right: 8px; }}
+        .save-btn button [data-testid="stMarkdownContainer"] p:before {{ content: "\\f0c7"; font-family: "Font Awesome 6 Free"; font-weight: 900; margin-right: 8px; }}
+        .delete-btn button [data-testid="stMarkdownContainer"] p:before {{ content: "\\f2ed"; font-family: "Font Awesome 6 Free"; font-weight: 900; margin-right: 8px; }}
+        .refresh-btn button [data-testid="stMarkdownContainer"] p:before {{ content: "\\f2f1"; font-family: "Font Awesome 6 Free"; font-weight: 900; margin-right: 8px; }}
+        .download-btn button [data-testid="stMarkdownContainer"] p:before {{ content: "\\f0ab"; font-family: "Font Awesome 6 Free"; font-weight: 900; margin-right: 8px; }}
+        .report-btn button [data-testid="stMarkdownContainer"] p:before {{ content: "\\f1c1"; font-family: "Font Awesome 6 Free"; font-weight: 900; margin-right: 8px; }}
+        .back-btn button [data-testid="stMarkdownContainer"] p:before {{ content: "\\f060"; font-family: "Font Awesome 6 Free"; font-weight: 900; margin-right: 8px; }}
+        .info-btn button [data-testid="stMarkdownContainer"] p:before {{ content: "\\f05a"; font-family: "Font Awesome 6 Free"; font-weight: 900; margin-right: 8px; }}
+        .upload-btn button [data-testid="stMarkdownContainer"] p:before {{ content: "\\f093"; font-family: "Font Awesome 6 Free"; font-weight: 900; margin-right: 8px; }}
+        .check-btn button [data-testid="stMarkdownContainer"] p:before {{ content: "\\f00c"; font-family: "Font Awesome 6 Free"; font-weight: 900; margin-right: 8px; }}
+        .chart-btn button [data-testid="stMarkdownContainer"] p:before {{ content: "\\f080"; font-family: "Font Awesome 6 Free"; font-weight: 900; margin-right: 8px; }}
+        .list-btn button [data-testid="stMarkdownContainer"] p:before {{ content: "\\f03a"; font-family: "Font Awesome 6 Free"; font-weight: 900; margin-right: 8px; }}
+        .settings-btn button [data-testid="stMarkdownContainer"] p:before {{ content: "\\f013"; font-family: "Font Awesome 6 Free"; font-weight: 900; margin-right: 8px; }}
+        .project-btn button [data-testid="stMarkdownContainer"] p:before {{ content: "\\f5fd"; font-family: "Font Awesome 6 Free"; font-weight: 900; margin-right: 8px; }}
+        
+        /* Fallback for different DOM versions */
+        [class*="-btn"] button div:before {{ font-family: "Font Awesome 6 Free"; font-weight: 900; }}
 
         /* --- Forms & Inputs --- */
         .stTextInput > div > div > input,

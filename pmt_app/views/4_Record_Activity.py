@@ -97,16 +97,18 @@ def record_activity_page():
     activities = database.get_baseline_schedule(project_id, user_id_filter=task_user_filter)
     
     if activities is None or activities.empty:
-        st.warning("<i class='fas fa-exclamation-triangle fa-icon'></i> No activities found for you in this project.")
+        st.warning("No activities found for you in this project.")
         st.stop()
     
     st.divider()
     
     # --- Completion Dialog ---
-        st.markdown(f"### <i class='fas fa-check-circle fa-icon'></i> Completing: **{activity_name}**")
+    @st.dialog("Complete Task", width="medium")
+    def complete_task_dialog(activity_id, activity_name, expected_output):
+        st.markdown(f"### Completing: **{activity_name}**")
         
         if expected_output:
-            st.info(f"<i class='fas fa-clipboard-list fa-icon'></i> **Expected Output:** {expected_output}")
+            st.info(f"**Expected Output:** {expected_output}")
         
         st.markdown("---")
         st.markdown("**Please upload the deliverable file associated with this task:**")
@@ -136,12 +138,12 @@ def record_activity_page():
                 # Update activity status
                 success, msg = database.update_activity_status(activity_id, 'Complete', current_user['id'])
                 if success:
-                    st.success(f"🎉 Task completed and output uploaded!")
+                    st.success("Task completed and output uploaded!")
                     st.rerun()
                 else:
                     st.error(msg)
         else:
-            st.warning("⚠️ You must upload the output file before marking this task as complete.")
+            st.warning("You must upload the output file before marking this task as complete.")
     
     # --- Summary Stats (Scoped to visible activities) ---
     total = len(activities)
@@ -202,36 +204,46 @@ def record_activity_page():
                             file_full_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', out['file_path'])
                             if os.path.exists(file_full_path):
                                 with open(file_full_path, "rb") as fp:
+                                    st.markdown('<div class="download-btn">', unsafe_allow_html=True)
                                     st.download_button(
-                                        f"📥 {out['file_name']}",
+                                        out['file_name'],
                                         data=fp.read(),
                                         file_name=out['file_name'],
                                         key=f"dl_{out['output_id']}",
                                         use_container_width=False
                                     )
+                                    st.markdown('</div>', unsafe_allow_html=True)
             
             with act_col2:
                 if status == "Not Started":
-                    if st.button("▶ Start Phase", key=f"btn_{row['activity_id']}", use_container_width=True):
+                    st.markdown('<div class="add-btn">', unsafe_allow_html=True)
+                    if st.button("Start Phase", key=f"btn_{row['activity_id']}", use_container_width=True):
                         success, msg = database.update_activity_status(row['activity_id'], 'Active', current_user['id'])
                         if success:
                             st.rerun()
+                    st.markdown('</div>', unsafe_allow_html=True)
                 elif status == "Active":
-                    if st.button("✅ Complete", key=f"btn_{row['activity_id']}", use_container_width=True, type="primary"):
+                    st.markdown('<div class="check-btn">', unsafe_allow_html=True)
+                    if st.button("Complete", key=f"btn_{row['activity_id']}", use_container_width=True, type="primary"):
                         complete_task_dialog(row['activity_id'], row['activity_name'], row.get('expected_output'))
+                    st.markdown('</div>', unsafe_allow_html=True)
                 else:
                     is_privileged = current_user['role'] in ['admin', 'pm', 'executive']
                     if is_privileged:
-                        if st.button("🔄 Reopen Task", key=f"btn_{row['activity_id']}", use_container_width=True):
+                        st.markdown('<div class="refresh-btn">', unsafe_allow_html=True)
+                        if st.button("Reopen Task", key=f"btn_{row['activity_id']}", use_container_width=True):
                             database.update_activity_status(row['activity_id'], 'Active', current_user['id'])
                             st.rerun()
+                        st.markdown('</div>', unsafe_allow_html=True)
                     else:
-                        st.button("✓ Done", disabled=True, key=f"btn_{row['activity_id']}", use_container_width=True)
+                        st.markdown('<div class="check-btn">', unsafe_allow_html=True)
+                        st.button("Done", disabled=True, key=f"btn_{row['activity_id']}", use_container_width=True)
+                        st.markdown('</div>', unsafe_allow_html=True)
         
         st.markdown('<div style="height:10px;"></div>', unsafe_allow_html=True)
 
     # Activity Audit Log
-    with st.expander("<i class='fas fa-history fa-icon'></i> Activity Audit Log (History)"):
+    with st.expander("Activity Audit Log (History)"):
         logs = database.get_df('''
             SELECT al.event_type, al.event_date, bs.activity_name, u.full_name as recorded_by
             FROM activity_log al

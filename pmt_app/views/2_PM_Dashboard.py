@@ -125,27 +125,33 @@ def pm_dashboard():
 
     with st.sidebar:
         st.header("Dashboard Controls")
-        if st.button("🔄 Refresh Data", use_container_width=True, type="primary"):
+        st.markdown('<div class="refresh-btn">', unsafe_allow_html=True)
+        if st.button("Refresh Data", use_container_width=True, type="primary"):
             st.rerun()
+        st.markdown('</div>', unsafe_allow_html=True)
         
         st.markdown("---")
         selected_project_str = st.selectbox("Select Project", project_list, index=default_idx)
         
         project_id = project_map[selected_project_str]
-        st.markdown("### 📄 Reports")
+        st.markdown("### Reports")
+        st.markdown('<div class="report-btn">', unsafe_allow_html=True)
         if st.button("Generate PDF Report", use_container_width=True):
             with st.spinner("Generating PDF..."):
                 try:
                     pdf_gen = pdf_generator.PDFReportGenerator(project_id)
                     pdf_bytes = pdf_gen.generate()
+                    st.markdown('<div class="download-btn">', unsafe_allow_html=True)
                     st.download_button(
-                        label="📥 Download PDF", data=pdf_bytes,
+                        label="Download PDF", data=pdf_bytes,
                         file_name=f"Project_Status_{project_id}.pdf",
                         mime="application/pdf", use_container_width=True
                     )
+                    st.markdown('</div>', unsafe_allow_html=True)
                     st.success("Report generated!")
                 except Exception as e:
                     st.error(f"Failed to generate PDF: {e}")
+        st.markdown('</div>', unsafe_allow_html=True)
     
     # Metrics
     m = calculations.get_project_metrics(project_id)
@@ -156,8 +162,11 @@ def pm_dashboard():
     # --- HEADER ---
     st.markdown(f"""
     <div class="report-header">
-        <div class="report-title">PROJECT STATUS REPORT</div>
-        <div class="report-date">{m['project_name']} ({m['project_number']}) | {pd.Timestamp.now().strftime('%B %d, %Y')}</div>
+        <div style="display: flex; align-items: center; gap: 15px;">
+            <i class="fas fa-file-invoice" style="font-size: 2.2rem;"></i>
+            <div class="report-title">PROJECT STATUS REPORT</div>
+        </div>
+        <div class="report-date" style="margin-left: 50px;">{m['project_name']} ({m['project_number']}) | {pd.Timestamp.now().strftime('%B %d, %Y')}</div>
     </div>
     """, unsafe_allow_html=True)
 
@@ -172,6 +181,7 @@ def pm_dashboard():
         
         summary_html = f"""
         <div class="summary-box">
+        <i class="fas fa-info-circle fa-icon"></i>
         The project <b>{m['project_name']}</b> is currently in <b>{m['actual_status']}</b> status. 
         Physical completion is estimated at <b>{formatted_pct}</b>. 
         Financial performance shows we are <b>{status_text}</b> with a forecasted completion cost of <b>{formatted_cost}</b>.
@@ -322,7 +332,9 @@ def pm_dashboard():
         col_fin_h, col_fin_b = st.columns([3, 1])
         with col_fin_h: st.markdown("### Financials")
         with col_fin_b: 
+            st.markdown('<div class="chart-btn">', unsafe_allow_html=True)
             if st.button("Full View", key="btn_full_fin", use_container_width=True): show_full_financials(project_id)
+            st.markdown('</div>', unsafe_allow_html=True)
         fin_fig = go.Figure()
         fin_items = [
             ('Forecast', m['forecast'], COLORS['fin_forecast']), 
@@ -389,7 +401,9 @@ def pm_dashboard():
         col_tl_h, col_tl_b = st.columns([3, 1])
         with col_tl_h: st.markdown("### Project Timeline")
         with col_tl_b:
+            st.markdown('<div class="list-btn">', unsafe_allow_html=True)
             if st.button("View Details", key="btn_full_tl", use_container_width=True): show_full_timeline(project_id, all_activities)
+            st.markdown('</div>', unsafe_allow_html=True)
         
         if not all_activities.empty:
             dash_filter = all_activities[all_activities['status_mapped'].isin(['Active', 'Not Started'])]
@@ -426,18 +440,20 @@ def pm_dashboard():
         if not all_activities.empty:
             milestones = all_activities.sort_values('planned_start')
             with col_ms_b:
+                st.markdown('<div class="list-btn">', unsafe_allow_html=True)
                 if st.button("All Stages", key="btn_full_ms", use_container_width=True): show_full_milestones(milestones)
+                st.markdown('</div>', unsafe_allow_html=True)
             
             # UPDATED: Show responsible person and output download
             ms_html = '<div style="background-color: var(--card-bg); padding: 15px; border-radius: 12px; border: 1px solid rgba(128, 128, 128, 0.1); box-shadow: 0 2px 5px rgba(0,0,0,0.02); min-height: 220px;">'
             for _, row in milestones.head(4).iterrows():
                 status_label = row['status_mapped']
                 status_color = COLORS['status_complete'] if status_label == 'Complete' else (COLORS['status_active'] if status_label == 'Active' else COLORS['status_not_started'])
-                icon = "✓" if status_label == 'Complete' else ("▶" if status_label == 'Active' else "○")
+                icon = "Done" if status_label == 'Complete' else ("Active" if status_label == 'Active' else "Pending")
                 
                 responsible_badge = ""
                 if pd.notna(row.get('responsible_name')) and row['responsible_name']:
-                    responsible_badge = f'<span class="badge-sm" style="background:rgba(95, 162, 232, 0.1); color:#5fa2e8; border:1px solid rgba(128, 128, 128, 0.2);">👤 {row["responsible_name"]}</span>'
+                    responsible_badge = f'<span class="badge-sm" style="background:rgba(95, 162, 232, 0.1); color:#5fa2e8; border:1px solid rgba(128, 128, 128, 0.2);">{row["responsible_name"]}</span>'
                 
                 ms_html += f'<div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid rgba(128, 128, 128, 0.1); padding:12px 0;"><div><span style="font-weight:500; font-size:0.9rem; display:block;">{row["activity_name"]}</span>{responsible_badge}</div><div style="text-align:right;"><span style="display:block; font-size:0.75rem; opacity:0.8;">{row["planned_finish"]}</span><span style="display:block; font-size:0.8rem; color:{status_color}; font-weight:600;">{icon} {status_label}</span></div></div>'
             ms_html += '</div>'
@@ -448,17 +464,17 @@ def pm_dashboard():
     st.markdown('<div style="height:30px"></div>', unsafe_allow_html=True)
 
     # --- ROW 4: BUDGET BURNDOWN ---
-    st.markdown("### 📉 Budget Burndown")
+    st.markdown("### Budget Burndown")
     bd = calculations.get_burndown_data(project_id)
     if bd:
         status_styles = {
-            "On Track":   (COLORS['status_active'],   "✅"),
-            "At Risk":    (COLORS['status_not_started'], "⚠️"),
-            "Over Budget":(COLORS['status_critical'], "🔴"),
-            "No Data":    (COLORS['subtext'],          "ℹ️"),
+            "On Track":   (COLORS['status_active'],   "OK"),
+            "At Risk":    (COLORS['status_not_started'], "Risk"),
+            "Over Budget":(COLORS['status_critical'], "Over"),
+            "No Data":    (COLORS['subtext'],          "Info"),
         }
         bd_status = bd["status"]
-        stat_color, stat_icon = status_styles.get(bd_status, (COLORS['subtext'], "ℹ️"))
+        stat_color, stat_icon = status_styles.get(bd_status, (COLORS['subtext'], "Info"))
 
         burn_col1, burn_col2, burn_col3 = st.columns([1, 1, 1])
         with burn_col1:
@@ -492,14 +508,14 @@ def pm_dashboard():
         )
         st.plotly_chart(bd_fig, use_container_width=True, config={"displayModeBar": False})
         if bd["actual_df"].empty:
-            st.info("ℹ️ No expenditure recorded yet — showing the ideal burndown baseline only.")
+            st.info("No expenditure recorded yet — showing the ideal burndown baseline only.")
     else:
-        st.warning("⚠️ Could not load project dates or budget to render the burndown chart.")
+        st.warning("Could not load project dates or budget to render the burndown chart.")
 
     st.markdown('<div style="height:30px"></div>', unsafe_allow_html=True)
 
     # --- ROW 5: TASK DELIVERABLES (NEW) ---
-    st.markdown("### 📎 Task Deliverables")
+    st.markdown("### <i class='fas fa-paperclip fa-icon'></i> Task Deliverables", unsafe_allow_html=True)
     
     all_outputs = database.get_all_outputs_for_project(project_id)
     
@@ -509,7 +525,7 @@ def pm_dashboard():
         
         for _, out in all_outputs.iterrows():
             uploaded_date = str(out['uploaded_at'])[:10] if pd.notna(out['uploaded_at']) else 'N/A'
-            deliverables_html += f'<div class="deliverable-row"><span style="flex:2; font-weight:500; font-size:0.9rem;">{out["activity_name"]}</span><span style="flex:2; font-size:0.85rem; color:#5fa2e8;">📄 {out["file_name"]}</span><span style="flex:1; font-size:0.8rem; opacity:0.8;">{out["uploader_name"]}</span><span style="flex:1; font-size:0.8rem; opacity:0.8;">{uploaded_date}</span></div>'
+            deliverables_html += f'<div class="deliverable-row"><span style="flex:2; font-weight:500; font-size:0.9rem;">{out["activity_name"]}</span><span style="flex:2; font-size:0.85rem; color:#5fa2e8;">{out["file_name"]}</span><span style="flex:1; font-size:0.8rem; opacity:0.8;">{out["uploader_name"]}</span><span style="flex:1; font-size:0.8rem; opacity:0.8;">{uploaded_date}</span></div>'
         
         deliverables_html += '</div>'
         st.markdown(deliverables_html, unsafe_allow_html=True)
@@ -521,19 +537,21 @@ def pm_dashboard():
             file_full_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', out['file_path'])
             if os.path.exists(file_full_path):
                 with dl_cols[i % len(dl_cols)]:
+                    st.markdown('<div class="download-btn">', unsafe_allow_html=True)
                     with open(file_full_path, "rb") as fp:
                         st.download_button(
-                            f"📥 {out['file_name']}", data=fp.read(),
+                            out['file_name'], data=fp.read(),
                             file_name=out['file_name'], key=f"dash_dl_{out['output_id']}",
                             use_container_width=True
                         )
+                    st.markdown('</div>', unsafe_allow_html=True)
     else:
-        st.info("📋 No deliverables uploaded yet. Outputs will appear here once tasks are marked as complete with uploaded files.")
+        st.info("No deliverables uploaded yet. Outputs will appear here once tasks are marked as complete with uploaded files.")
 
     st.markdown('<div style="height:30px"></div>', unsafe_allow_html=True)
 
     # --- ROW 6: RISK REGISTER ---
-    st.markdown("### ⚠️ Risk Register")
+    st.markdown("### Risk Register")
     risks = database.get_project_risks(project_id)
     
     if not risks.empty:
@@ -544,7 +562,7 @@ def pm_dashboard():
             for _, row in risks.iterrows():
                 impact_code = row['impact']
                 impact_color = COLORS['risk_high'] if impact_code == 'H' else (COLORS['risk_medium'] if impact_code == 'M' else COLORS['risk_low'])
-                status_icon = "⚠️" if impact_code == 'H' else ("❗" if impact_code == 'M' else "✓")
+                status_icon = "High" if impact_code == 'H' else ("Med" if impact_code == 'M' else "Low")
                 risk_html += f"""
 <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid rgba(128, 128, 128, 0.1); padding:12px 0;">
     <div style="flex:1; padding-right:10px;">

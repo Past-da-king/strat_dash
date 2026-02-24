@@ -4,21 +4,66 @@ import auth
 import styles
 import os
 
-# Page Config
+# Page Config (Set this first)
 st.set_page_config(
-    page_title="PM Tool - Login",
-    page_icon="🔒",
-    layout="centered",
-    initial_sidebar_state="collapsed"
+    page_title="PM Tool",
+    page_icon=None,
+    layout="wide",
+    initial_sidebar_state="expanded"
 )
 
-def main():
-    # Initialize session state for auth
-    auth.init_session()
-    
-    # Apply Global Styles
+def home_view():
+    """The default home view after login."""
     styles.global_css()
+    user = auth.get_current_user()
+    
+    st.markdown(f"""
+    <div style="background: rgba(255, 255, 255, 0.05); padding: 2.5rem; border-radius: 16px; border: 1px solid rgba(128, 128, 128, 0.2); box-shadow: 0 4px 20px rgba(0,0,0,0.1); text-align: center; margin-top: 2rem;">
+        <div style="font-size: 1.5rem; opacity: 0.8; margin-bottom: 0.5rem;">Hello,</div>
+        <div style="font-size: 2.5rem; font-weight: 700; color: #5fa2e8; margin-bottom: 1rem;">{user['full_name']}</div>
+        <div style="display: inline-block; padding: 4px 12px; background: rgba(95, 162, 232, 0.1); color: #5fa2e8; border-radius: 20px; font-weight: 600; font-size: 0.85rem; margin-bottom: 2rem;">
+            {user['role'].upper()} ACCESS
+        </div>
+        <div style="opacity: 0.8; margin-bottom: 1rem;">
+            Use the sidebar to navigate through your projects and dashboards.
+        </div>
+        <div style="background: rgba(44, 90, 160, 0.1); padding: 1rem; border-radius: 8px; margin-top: 1rem; border: 1px dashed rgba(95, 162, 232, 0.4);">
+            <div style="font-weight: 600; color: #5fa2e8; font-size: 0.9rem;">New Template Available!</div>
+            <div style="font-size: 0.8rem; opacity: 0.9;">I've updated the Project Template with the new columns: <br><b>Responsible (Username)</b> and <b>Expected Output</b>.</div>
+            <div style="font-size: 0.75rem; margin-top: 5px; opacity: 0.7;">Location: <code>DASHBOARD/templates/Project_Template.xlsx</code></div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    st.markdown('<div style="height:20px"></div>', unsafe_allow_html=True)
+    
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        st.markdown('<div class="exec-btn">', unsafe_allow_html=True)
+        if st.button("Executive Overview", use_container_width=True):
+            st.switch_page("views/1_Executive_Dashboard.py")
+        st.markdown('</div>', unsafe_allow_html=True)
+    with c2:
+        st.markdown('<div class="pm-btn">', unsafe_allow_html=True)
+        if st.button("Project Management", use_container_width=True):
+            st.switch_page("views/2_PM_Dashboard.py")
+        st.markdown('</div>', unsafe_allow_html=True)
+    with c3:
+        st.markdown('<div class="logout-btn">', unsafe_allow_html=True)
+        if st.button("Logout", type="primary", use_container_width=True):
+            auth.logout()
+            st.rerun()
+        st.markdown('</div>', unsafe_allow_html=True)
 
+def login_view():
+    """The view for non-logged in users."""
+    styles.global_css()
+    # Inject trigger to hide sidebar at login
+    st.markdown('<div class="hide-sidebar"></div>', unsafe_allow_html=True)
+    
+    # Direct link for FontAwesome to ensure it loads
+    st.markdown('<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">', unsafe_allow_html=True)
+    
     # --- BRANDING ---
     st.markdown("""
         <div style="text-align: center; margin-bottom: 2rem; margin-top: 3rem;">
@@ -33,19 +78,21 @@ def main():
         </div>
     """, unsafe_allow_html=True)
 
-    if not auth.is_logged_in():
-        # Inject trigger to hide sidebar at login
-        st.markdown('<div class="hide-sidebar"></div>', unsafe_allow_html=True)
-        
+    # Center the form and constrain width - Narrower layout
+    col_space1, col_form, col_space2 = st.columns([1.5, 2, 1.5])
+    
+    with col_form:
         # Tabs for Login/Signup
-        tab_login, tab_signup = st.tabs(["<i class='fas fa-key fa-icon'></i> LOGIN", "<i class='fas fa-user-plus fa-icon'></i> REGISTER"])
+        tab_login, tab_signup = st.tabs(["LOGIN", "REGISTER"])
         
         with tab_login:
             with st.form("login_form", clear_on_submit=False):
                 st.markdown("### Welcome Back")
                 username = st.text_input("Username")
                 password = st.text_input("Password", type="password")
-                submit = st.form_submit_button("LOGIN")
+                st.markdown('<div class="exec-btn">', unsafe_allow_html=True)
+                submit = st.form_submit_button("LOGIN", use_container_width=True)
+                st.markdown('</div>', unsafe_allow_html=True)
                 
                 if submit:
                     if auth.login(username, password):
@@ -63,7 +110,9 @@ def main():
                 new_name = st.text_input("Full Name *")
                 new_role = st.selectbox("Requested Role", ["pm", "executive", "team"])
                 
-                signup_submit = st.form_submit_button("REGISTER")
+                st.markdown('<div class="add-btn">', unsafe_allow_html=True)
+                signup_submit = st.form_submit_button("REGISTER", use_container_width=True)
+                st.markdown('</div>', unsafe_allow_html=True)
                 
                 if signup_submit:
                     if not new_user or not new_pass or not new_name:
@@ -84,47 +133,59 @@ def main():
                         except Exception as e:
                             st.error(f"Error: {e}")
 
-        st.markdown("""
-            <div style="text-align: center; margin-top: 3rem; color: #94a3b8; font-size: 0.8rem;">
-                © 2026 PM Tool Enterprise. All rights reserved.
-            </div>
-        """, unsafe_allow_html=True)
-
-    else:
-        # LOGGED IN VIEW - Welcome & Navigation Quick Links
-        user = auth.get_current_user()
-        
-        st.markdown(f"""
-        <div style="background: rgba(255, 255, 255, 0.05); padding: 2.5rem; border-radius: 16px; border: 1px solid rgba(128, 128, 128, 0.2); box-shadow: 0 4px 20px rgba(0,0,0,0.1); text-align: center;">
-            <div style="font-size: 1.5rem; opacity: 0.8; margin-bottom: 0.5rem;">Hello,</div>
-            <div style="font-size: 2.5rem; font-weight: 700; color: #5fa2e8; margin-bottom: 1rem;">{user['full_name']}</div>
-            <div style="display: inline-block; padding: 4px 12px; background: rgba(95, 162, 232, 0.1); color: #5fa2e8; border-radius: 20px; font-weight: 600; font-size: 0.85rem; margin-bottom: 2rem;">
-                {user['role'].upper()} ACCESS
-            </div>
-            <div style="opacity: 0.8; margin-bottom: 1rem;">
-                Use the sidebar to navigate through your projects and dashboards.
-            </div>
-            <div style="background: rgba(44, 90, 160, 0.1); padding: 1rem; border-radius: 8px; margin-top: 1rem; border: 1px dashed rgba(95, 162, 232, 0.4);">
-                <div style="font-weight: 600; color: #5fa2e8; font-size: 0.9rem;">📂 New Template Available!</div>
-                <div style="font-size: 0.8rem; opacity: 0.9;">I've updated the Project Template with the new columns: <br><b>Responsible (Username)</b> and <b>Expected Output</b>.</div>
-                <div style="font-size: 0.75rem; margin-top: 5px; opacity: 0.7;">Location: <code>DASHBOARD/templates/Project_Template.xlsx</code></div>
-            </div>
+    st.markdown("""
+        <div style="text-align: center; margin-top: 3rem; color: #94a3b8; font-size: 0.8rem;">
+            © 2026 PM Tool Enterprise. All rights reserved.
         </div>
-        """, unsafe_allow_html=True)
+    """, unsafe_allow_html=True)
+
+def main():
+    # Initialize session state for auth
+    auth.init_session()
+    
+    if not auth.is_logged_in():
+        login_view()
+    else:
+        user = auth.get_current_user()
+        role = user['role']
         
-        st.markdown('<div style="height:20px"></div>', unsafe_allow_html=True)
+        # Define Pages
+        home_page = st.Page(home_view, title="Dashboard Home", icon=":material/home:", default=True)
         
-        c1, c2, c3 = st.columns(3)
-        with c1:
-            if st.button("<i class='fas fa-chart-line fa-icon'></i> Executive Overview", use_container_width=True):
-                st.switch_page("pages/1_Executive_Dashboard.py")
-        with c2:
-            if st.button("<i class='fas fa-tasks fa-icon'></i> Project Management", use_container_width=True):
-                st.switch_page("pages/2_PM_Dashboard.py")
-        with c3:
-            if st.button("<i class='fas fa-sign-out-alt fa-icon'></i> Logout", type="primary", use_container_width=True):
-                auth.logout()
-                st.rerun()
+        exec_dash = st.Page("views/1_Executive_Dashboard.py", title="Executive Portfolio", icon=":material/dashboard:")
+        pm_dash = st.Page("views/2_PM_Dashboard.py", title="Project Dashboard", icon=":material/analytics:")
+        proj_setup = st.Page("views/3_Project_Setup.py", title="Project Setup", icon=":material/add_business:")
+        record_act = st.Page("views/4_Record_Activity.py", title="Record Activity", icon=":material/bolt:")
+        record_exp = st.Page("views/5_Record_Expenditure.py", title="Record Expenditure", icon=":material/payments:")
+        risk_reg = st.Page("views/5_Risk_Register.py", title="Risk Register", icon=":material/warning:")
+        admin_panel = st.Page("views/6_Admin_Panel.py", title="Admin Panel", icon=":material/admin_panel_settings:")
+        admin_settings = st.Page("views/6_Admin_Settings.py", title="System Settings", icon=":material/settings:")
+        logout = st.Page(auth.logout, title="Logout", icon=":material/logout:")
+
+        # Role-based filtering
+        pages = [home_page]
+        
+        if role in ['admin', 'executive']:
+            pages.append(exec_dash)
+            
+        if role in ['pm', 'admin', 'executive']:
+            pages.append(pm_dash)
+            pages.append(proj_setup)
+            
+        # Everyone (team, pm, admin, executive) gets these
+        pages.append(record_act)
+        pages.append(record_exp)
+        pages.append(risk_reg)
+        
+        if role in ['admin', 'executive']:
+            pages.append(admin_panel)
+            pages.append(admin_settings)
+            
+        pages.append(logout)
+        
+        # Initialize Navigation
+        pg = st.navigation(pages)
+        pg.run()
 
 if __name__ == "__main__":
     main()

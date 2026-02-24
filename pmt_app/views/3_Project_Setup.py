@@ -14,15 +14,18 @@ def project_setup_page():
     styles.global_css()
     st.markdown("""
     <div style="background: linear-gradient(135deg, #2c5aa0 0%, #5fa2e8 100%); color: white; padding: 1.5rem 2rem; border-radius: 12px; margin-bottom: 2rem; box-shadow: 0 4px 12px rgba(44, 90, 160, 0.2);">
-        <div style="font-size: 2.2rem; font-weight: 700; letter-spacing: -1px;">🏗️ Setup New Project</div>
-        <div style="font-size: 1rem; opacity: 0.9;">Initialize a new project, assign teams, and set baseline schedules.</div>
+        <div style="display: flex; align-items: center; gap: 15px;">
+            <i class="fas fa-building" style="font-size: 2.2rem;"></i>
+            <div style="font-size: 2.2rem; font-weight: 700; letter-spacing: -1px;">Setup New Project</div>
+        </div>
+        <div style="font-size: 1rem; opacity: 0.9; margin-left: 50px;">Initialize a new project, assign teams, and set baseline schedules.</div>
     </div>
     """, unsafe_allow_html=True)
     
-    tab1, tab2 = st.tabs(["📝 Manual Entry", "📊 Excel Import"])
+    tab_manual, tab_import = st.tabs(["MANUAL ENTRY", "EXCEL IMPORT"])
     
-    with tab1:
-        st.subheader("Enter Project Details")
+    with tab_manual:
+        st.markdown("### Project Basics")
         with st.form("manual_project_form"):
             col1, col2 = st.columns(2)
             with col1:
@@ -51,13 +54,15 @@ def project_setup_page():
                 team_options = team_options[team_options['user_id'] != pm_id]
                 
                 team_map = {f"{row['full_name']} ({row['role']})": row['user_id'] for _, row in team_options.iterrows()}
-                assigned_team = st.multiselect("Assign Project Team (Recorders/Assistants)", list(team_map.keys()))
+                assigned_team = st.multiselect("Assign Project Team", list(team_map.keys()))
             
-            submit = st.form_submit_button("Create Project & Plan", type="primary")
+            st.markdown('<div class="add-btn">', unsafe_allow_html=True)
+            submit = st.form_submit_button("Create Project & Plan", type="primary", use_container_width=True)
+            st.markdown('</div>', unsafe_allow_html=True)
             
             st.markdown("---")
-            st.subheader("📋 Project Plan (Baseline Schedule)")
-            st.info("Assign budget, dates, responsible person, and expected outputs to project phases.")
+            st.subheader("Project Plan (Baseline Schedule)")
+            st.info("<i class='fas fa-info-circle fa-icon'></i> Assign budget, dates, responsible person, and expected outputs to project phases.")
             
             # Build user map for responsible person selection
             all_users = database.get_df("SELECT user_id, full_name FROM users WHERE status = 'approved'")
@@ -108,7 +113,7 @@ def project_setup_page():
                         if assigned_team:
                             for member_key in assigned_team:
                                 member_id = team_map[member_key]
-                                database.assign_user_to_project(project_id, member_id, 'recorder', creator_id)
+                                database.assign_user_to_project(project_id, member_id, 'team', creator_id)
                         
                         # 3. Add Baseline Activities (with responsible person + expected output)
                         for _, row in pd.DataFrame(plan_df).iterrows():
@@ -129,25 +134,28 @@ def project_setup_page():
                                 'expected_output': row.get('expected_output', '')
                             })
                         
-                        st.success(f"🎉 Project and Plan Created Successfully! ID: {project_id}")
+                        st.success(f"Project and Plan Created Successfully! ID: {project_id}")
                         st.balloons()
                     except Exception as e:
                         st.error(f"Error creating project: {e}")
 
-    with tab2:
+    with tab_import:
         # Download Section
         # Get path relative to this script: pages/ -> pmt_app/ -> project_root/ -> templates/
         root_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
         template_path = os.path.join(root_dir, 'templates', 'Project_Template.xlsx')
         if os.path.exists(template_path):
             with open(template_path, "rb") as f:
+                st.markdown('<div class="download-btn">', unsafe_allow_html=True)
                 st.download_button(
-                    label="📥 Download Blank Project Template",
+                    label="Download Blank Project Template",
                     data=f,
                     file_name="Project_Template.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    help="Download the official blank Excel template to fill in project data."
+                    help="Download the official blank Excel template to fill in project data.",
+                    use_container_width=True
                 )
+                st.markdown('</div>', unsafe_allow_html=True)
         else:
             st.warning("⚠️ Template file not found in /templates folder.")
 
@@ -157,13 +165,15 @@ def project_setup_page():
         
         if uploaded_file:
             import importer
-            if st.button("🚀 Start Import", type="primary"):
+            st.markdown('<div class="refresh-btn">', unsafe_allow_html=True)
+            if st.button("Start Import", use_container_width=True):
                 try:
                     with st.spinner("Processing Excel..."):
                         project_id = importer.import_project(uploaded_file, auth.get_current_user()['id'])
-                        st.success(f"✅ Project Imported Successfully! ID: {project_id}")
+                        st.success(f"Project Imported Successfully! ID: {project_id}")
                 except Exception as e:
                     st.error(f"Import Failed: {e}")
+            st.markdown('</div>', unsafe_allow_html=True)
 
 if __name__ == "__main__":
     project_setup_page()

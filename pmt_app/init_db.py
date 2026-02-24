@@ -185,11 +185,11 @@ def init_db():
     VALUES (?, ?, ?, ?)
     ''', ('exec_user', exec_pw, 'executive', 'Jane Executive'))
 
-    rec_pw = generate_password_hash('rec123')
+    rec_pw = generate_password_hash('team123')
     cursor.execute('''
     INSERT INTO users (username, password_hash, role, full_name)
     VALUES (?, ?, ?, ?)
-    ''', ('recorder', rec_pw, 'recorder', 'Bob Recorder'))
+    ''', ('team_user', rec_pw, 'team', 'Bob Team Member'))
 
     conn.commit()
     conn.close()

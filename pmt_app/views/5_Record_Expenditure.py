@@ -54,19 +54,24 @@ def record_exp_page():
     selected_act_str = st.selectbox("Linked Activity (Optional)", act_list)
     activity_id = act_map[selected_act_str]
 
-    # 3. Entry Form
-    with st.form("exp_log_form", clear_on_submit=True):
-        col1, col2 = st.columns(2)
-        with col1:
-            category = st.selectbox("Category", ["Labour", "Material", "Vehicle", "Diesel", "Other"])
-            amount = st.number_input("Amount (R)", min_value=0.01, step=100.0)
-            spend_date = st.date_input("Spend Date", datetime.now())
-        
-        with col2:
-            reference = st.text_input("Reference (Invoice / PO) *")
-            description = st.text_area("Description")
-        
-        submit = st.form_submit_button("<i class='fas fa-save fa-icon'></i> Log Expenditure")
+    # 3. Entry Form - Constrain width
+    col_space1, col_center, col_space2 = st.columns([1, 2, 1])
+    
+    with col_center:
+        with st.form("exp_log_form", clear_on_submit=True):
+            col1, col2 = st.columns(2)
+            with col1:
+                category = st.selectbox("Category", ["Labour", "Material", "Vehicle", "Diesel", "Other"])
+                amount = st.number_input("Amount (R)", min_value=0.01, step=100.0)
+                spend_date = st.date_input("Spend Date", datetime.now())
+            
+            with col2:
+                reference = st.text_input("Reference (Invoice / PO) *")
+                description = st.text_area("Description")
+            
+            st.markdown('<div class="save-btn">', unsafe_allow_html=True)
+            submit = st.form_submit_button("Log Expenditure", use_container_width=True)
+            st.markdown('</div>', unsafe_allow_html=True)
         
         if submit:
             if not reference:
