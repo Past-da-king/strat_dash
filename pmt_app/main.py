@@ -3,11 +3,18 @@ import database
 import auth
 import styles
 import os
+from pathlib import Path
+
+# Portable logo path — image lives in pmt_app/image/image.png
+LOGO_PATH = Path(__file__).parent / "image" / "image.png"
+# Read as bytes for reliable rendering on any platform or host
+with open(LOGO_PATH, "rb") as _f:
+    LOGO_BYTES = _f.read()
 
 # Page Config (Set this first)
 st.set_page_config(
     page_title="Strat Edge Project Portal",
-    page_icon="image/image.png",
+    page_icon=LOGO_BYTES,
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -57,44 +64,44 @@ def home_view():
 def login_view():
     """The view for non-logged in users."""
     styles.global_css()
-    # Inject trigger to hide sidebar at login
     st.markdown('<div class="hide-sidebar"></div>', unsafe_allow_html=True)
-    
-    # Center the form and constrain width - Narrower layout
+
+    # Vertically center everything with top padding
+    st.markdown('<div style="height: 6vh;"></div>', unsafe_allow_html=True)
+
     col_space1, col_form, col_space2 = st.columns([1.5, 2, 1.5])
-    
+
     with col_form:
-        # BRAND LOGO INSIDE COLUMN
-        c_left, c_mid, c_right = st.columns([1, 2, 1])
-        with c_mid:
-            st.image("image/image.png", width=180)
-        
+        # --- COMPACT HEADER: small logo + company name side by side ---
+        h_left, h_logo, h_text, h_right = st.columns([1, 1, 3, 1])
+        with h_logo:
+            st.image(LOGO_BYTES, width=55)
+        with h_text:
+            st.markdown("""
+                <div style="display: flex; flex-direction: column; justify-content: center; height: 100%; padding-top: 8px;">
+                    <div style="color: white; font-size: 1.3rem; font-weight: 800; letter-spacing: -0.5px; line-height: 1.1;">STRAT EDGE</div>
+                    <div style="color: #38bdf8; font-size: 0.65rem; font-weight: 600; letter-spacing: 3px; margin-top: 3px;">PROJECT PORTAL</div>
+                </div>
+            """, unsafe_allow_html=True)
+
         st.markdown("""
-            <div style="text-align: center; margin-top: -10px; margin-bottom: 20px;">
-                <div style="color: white; font-size: 1.8rem; font-weight: 800; letter-spacing: -1px; line-height: 1;">
-                    STRAT EDGE
-                </div>
-                <div style="color: #38bdf8; font-size: 1rem; font-weight: 600; letter-spacing: 2px; margin-top: 5px;">
-                    PROJECT PORTAL
-                </div>
-                <div style="color: #94a3b8; font-size: 0.75rem; font-style: italic; margin-top: 8px; opacity: 0.8;">
-                    "Turning Insight into Advantage"
-                </div>
+            <div style="text-align: center; color: #64748b; font-size: 0.72rem; font-style: italic; margin-top: 4px; margin-bottom: 18px; opacity: 0.85;">
+                "Turning Insight into Advantage"
             </div>
         """, unsafe_allow_html=True)
 
         # Tabs for Login/Signup
         tab_login, tab_signup = st.tabs(["LOGIN", "REGISTER"])
-        
+
         with tab_login:
             with st.form("login_form", clear_on_submit=False):
-                st.markdown('<div style="color: #38bdf8; font-size: 1.5rem; font-weight: 700; margin-bottom: 10px;">Welcome Back</div>', unsafe_allow_html=True)
+                st.markdown('<div style="color: #38bdf8; font-size: 1.2rem; font-weight: 700; margin-bottom: 8px;">Welcome Back</div>', unsafe_allow_html=True)
                 username = st.text_input("Username")
                 password = st.text_input("Password", type="password")
                 st.markdown('<div class="exec-btn">', unsafe_allow_html=True)
                 submit = st.form_submit_button("LOGIN", use_container_width=True)
                 st.markdown('</div>', unsafe_allow_html=True)
-                
+
                 if submit:
                     if auth.login(username, password):
                         st.success("Login successful! Redirecting...")
@@ -110,11 +117,11 @@ def login_view():
                 new_pass = st.text_input("Password *", type="password")
                 new_name = st.text_input("Full Name *")
                 new_role = st.selectbox("Requested Role", ["pm", "executive", "team"])
-                
+
                 st.markdown('<div class="add-btn">', unsafe_allow_html=True)
                 signup_submit = st.form_submit_button("REGISTER", use_container_width=True)
                 st.markdown('</div>', unsafe_allow_html=True)
-                
+
                 if signup_submit:
                     if not new_user or not new_pass or not new_name:
                         st.error("All fields are required.")
@@ -135,10 +142,11 @@ def login_view():
                             st.error(f"Error: {e}")
 
     st.markdown("""
-        <div style="text-align: center; margin-top: 3rem; color: #94a3b8; font-size: 0.8rem;">
-            © 2026 PM Tool Enterprise. All rights reserved.
+        <div style="text-align: center; margin-top: 2rem; color: #334155; font-size: 0.72rem; letter-spacing: 1px;">
+            © 2026 STRAT EDGE SOLUTIONS. ALL RIGHTS RESERVED.
         </div>
     """, unsafe_allow_html=True)
+
 
 def main():
     # Initialize session state for auth
