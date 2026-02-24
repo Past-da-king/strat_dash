@@ -180,8 +180,10 @@ def record_activity_page():
                 st.markdown(f'<div class="op-meta"><i class="far fa-calendar-alt"></i> Planned: {row["planned_start"].strftime("%d %b %Y")} &mdash; {row["planned_finish"]}</div>', unsafe_allow_html=True)
                 
                 badges_html = f'<div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:8px;">'
-                if row.get('responsible_name'):
-                    badges_html += f'<span class="badge badge-user"><i class="fas fa-user-circle"></i> {row["responsible_name"]}</span>'
+                resp_name = row.get('responsible_name')
+                display_name = resp_name if pd.notna(resp_name) and resp_name else "Unassigned"
+                badges_html += f'<span class="badge badge-user"><i class="fas fa-user-circle"></i> Assigned to: {display_name}</span>'
+                
                 if row.get('expected_output'):
                     badges_html += f'<span class="badge badge-output"><i class="fas fa-clipboard-list"></i> {row["expected_output"]}</span>'
                 badges_html += '</div>'
