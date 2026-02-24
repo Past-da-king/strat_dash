@@ -13,7 +13,7 @@ def record_exp_page():
     styles.global_css()
     
     st.markdown("""
-    <div style="background: linear-gradient(135deg, #2c5aa0 0%, #5fa2e8 100%); color: white; padding: 1.5rem 2rem; border-radius: 12px; margin-bottom: 1.5rem; box-shadow: 0 4px 12px rgba(44, 90, 160, 0.2);">
+    <div style="background: linear-gradient(135deg, #0c4a6e 0%, #0ea5e9 100%); color: white; padding: 1.5rem 2rem; border-radius: 12px; margin-bottom: 1.5rem; box-shadow: 0 4px 12px rgba(12, 74, 110, 0.2);">
         <div style="display: flex; align-items: center; gap: 12px;">
             <i class="fas fa-money-bill-wave" style="font-size: 1.6rem;"></i>
             <div style="font-size: 1.6rem; font-weight: 700;">Record Expenditure</div>

@@ -37,7 +37,7 @@ def record_activity_page():
             border-left: 5px solid #4caf50;
         }
         .task-card-active {
-            border-left: 5px solid #2c5aa0;
+            border-left: 5px solid #0ea5e9;
         }
         .task-card-pending {
             border-left: 5px solid #ffc107;

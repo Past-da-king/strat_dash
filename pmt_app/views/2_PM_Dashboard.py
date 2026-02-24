@@ -25,11 +25,11 @@ def pm_dashboard():
     
     # --- BRAND COLORS ---
     COLORS = {
-        'status_not_started': '#ffc107',
-        'status_active': '#4caf50',
-        'status_complete': '#2c5aa0',
-        'status_critical': '#f44336',
-        'fin_budget': '#334155',
+        'status_not_started': '#f59e0b',
+        'status_active': '#10b981',
+        'status_complete': '#0ea5e9',
+        'status_critical': '#ef4444',
+        'fin_budget': '#1e293b',
         'fin_actual': '#0891b2',
         'fin_forecast': '#7c3aed',
         'cat_labour': '#db2777',
@@ -161,10 +161,10 @@ def pm_dashboard():
 
     # --- HEADER ---
     st.markdown(f"""
-    <div class="report-header">
+    <div class="report-header" style="background: linear-gradient(135deg, #0c4a6e 0%, #0ea5e9 100%);">
         <div style="display: flex; align-items: center; gap: 15px;">
             <i class="fas fa-file-invoice" style="font-size: 2.2rem;"></i>
-            <div class="report-title">PROJECT STATUS REPORT</div>
+            <div class="report-title">STRATEGIC STATUS REPORT</div>
         </div>
         <div class="report-date" style="margin-left: 50px;">{m['project_name']} ({m['project_number']}) | {pd.Timestamp.now().strftime('%B %d, %Y')}</div>
     </div>

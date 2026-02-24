@@ -22,14 +22,14 @@ plt.style.use('seaborn-v0_8-whitegrid')
 sns.set_palette("deep")
 
 # --- BRAND COLORS ---
-PRIMARY_HEX = '#2c5aa0'
-SECONDARY_HEX = '#5fa2e8'
-ACCENT_HEX = '#ffc107'
-SUCCESS_HEX = '#4caf50'
-DANGER_HEX = '#f44336'
-TEXT_HEX = '#333333'
-LIGHT_BG_HEX = '#f8f9fa'
-GRAY_LINE_HEX = '#e0e0e0'
+PRIMARY_HEX = '#0c4a6e'
+SECONDARY_HEX = '#0ea5e9'
+ACCENT_HEX = '#38bdf8'
+SUCCESS_HEX = '#10b981'
+DANGER_HEX = '#ef4444'
+TEXT_HEX = '#1e293b'
+LIGHT_BG_HEX = '#f8fafc'
+GRAY_LINE_HEX = '#e2e8f0'
 
 PRIMARY_COLOR = colors.HexColor(PRIMARY_HEX)
 SECONDARY_COLOR = colors.HexColor(SECONDARY_HEX)
@@ -114,13 +114,18 @@ class PDFReportGenerator:
         # Main square
         canvas.setFillColor(colors.white)
         canvas.rect(0, 0, size, size, fill=1, stroke=0)
-        # Inner accent
+        # Inner accent (Arrow-like triangle from Strat Edge logo)
         canvas.setFillColor(ACCENT_COLOR)
-        canvas.circle(size*0.7, size*0.7, size*0.2, fill=1, stroke=0)
-        # Text "PM"
-        canvas.setFillColor(PRIMARY_COLOR)
-        canvas.setFont("Helvetica-Bold", size*0.6)
-        canvas.drawCentredString(size*0.4, size*0.3, "PM")
+        p = canvas.beginPath()
+        p.moveTo(size*0.2, size*0.2)
+        p.lineTo(size*0.8, size*0.5)
+        p.lineTo(size*0.2, size*0.8)
+        p.close()
+        canvas.drawPath(p, fill=1, stroke=0)
+        # Text "S.E"
+        canvas.setFillColor(colors.white)
+        canvas.setFont("Helvetica-Bold", size*0.3)
+        canvas.drawCentredString(size*0.35, size*0.4, "S.E")
         canvas.restoreState()
 
     def _header_footer(self, canvas, doc):

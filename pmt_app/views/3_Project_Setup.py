@@ -13,7 +13,7 @@ def project_setup_page():
     auth.require_role(['pm', 'admin', 'executive'])
     styles.global_css()
     st.markdown("""
-    <div style="background: linear-gradient(135deg, #2c5aa0 0%, #5fa2e8 100%); color: white; padding: 1.5rem 2rem; border-radius: 12px; margin-bottom: 2rem; box-shadow: 0 4px 12px rgba(44, 90, 160, 0.2);">
+    <div style="background: linear-gradient(135deg, #0c4a6e 0%, #0ea5e9 100%); color: white; padding: 1.5rem 2rem; border-radius: 12px; margin-bottom: 2rem; box-shadow: 0 4px 12px rgba(12, 74, 110, 0.2);">
         <div style="display: flex; align-items: center; gap: 15px;">
             <i class="fas fa-building" style="font-size: 2.2rem;"></i>
             <div style="font-size: 2.2rem; font-weight: 700; letter-spacing: -1px;">Setup New Project</div>

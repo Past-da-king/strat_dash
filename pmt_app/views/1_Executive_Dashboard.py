@@ -16,12 +16,12 @@ def executive_dashboard():
     
     # --- Header ---
     st.markdown("""
-    <div style="background: linear-gradient(135deg, #2c5aa0 0%, #5fa2e8 100%); color: white; padding: 2rem; border-radius: 12px; margin-bottom: 2rem; box-shadow: 0 4px 12px rgba(44, 90, 160, 0.2);">
+    <div style="background: linear-gradient(135deg, #0c4a6e 0%, #0ea5e9 100%); color: white; padding: 2rem; border-radius: 12px; margin-bottom: 2rem; box-shadow: 0 4px 12px rgba(12, 74, 110, 0.2);">
         <div style="display: flex; align-items: center; gap: 15px;">
             <i class="fas fa-chart-pie" style="font-size: 2.2rem;"></i>
             <div style="font-size: 2.2rem; font-weight: 700; letter-spacing: -0.5px;">PORTFOLIO OVERVIEW</div>
         </div>
-        <div style="font-size: 0.95rem; opacity: 0.9; margin-top: 0.5rem; margin-left: 50px;">All active projects at a glance</div>
+        <div style="font-size: 0.95rem; opacity: 0.9; margin-top: 0.5rem; margin-left: 50px;">Strategic Project Performance Portal</div>
     </div>
     """, unsafe_allow_html=True)
     

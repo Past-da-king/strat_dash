@@ -28,12 +28,12 @@ def global_css():
 
         /* --- Root Variables (Theme-Aware) --- */
         :root {{
-            --primary-color: #2c5aa0;
-            --primary-light: #5fa2e8;
-            --primary-gradient: linear-gradient(135deg, #2c5aa0 0%, #5fa2e8 100%);
-            --success-color: #4caf50;
-            --warning-color: #ffc107;
-            --danger-color: #f44336;
+            --primary-color: #0c4a6e;
+            --primary-light: #0ea5e9;
+            --primary-gradient: linear-gradient(135deg, #0c4a6e 0%, #0ea5e9 100%);
+            --success-color: #10b981;
+            --warning-color: #f59e0b;
+            --danger-color: #ef4444;
             
             /* Use inherit or Streamlit variables for text to support light/dark modes */
             --radius-sm: 8px;

@@ -6,8 +6,8 @@ import os
 
 # Page Config (Set this first)
 st.set_page_config(
-    page_title="PM Tool",
-    page_icon=None,
+    page_title="Strat Edge Project Portal",
+    page_icon="image/image.png",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -20,17 +20,16 @@ def home_view():
     st.markdown(f"""
     <div style="background: rgba(255, 255, 255, 0.05); padding: 2.5rem; border-radius: 16px; border: 1px solid rgba(128, 128, 128, 0.2); box-shadow: 0 4px 20px rgba(0,0,0,0.1); text-align: center; margin-top: 2rem;">
         <div style="font-size: 1.5rem; opacity: 0.8; margin-bottom: 0.5rem;">Hello,</div>
-        <div style="font-size: 2.5rem; font-weight: 700; color: #5fa2e8; margin-bottom: 1rem;">{user['full_name']}</div>
-        <div style="display: inline-block; padding: 4px 12px; background: rgba(95, 162, 232, 0.1); color: #5fa2e8; border-radius: 20px; font-weight: 600; font-size: 0.85rem; margin-bottom: 2rem;">
+        <div style="font-size: 2.5rem; font-weight: 700; color: #0ea5e9; margin-bottom: 1rem;">{user['full_name']}</div>
+        <div style="display: inline-block; padding: 4px 12px; background: rgba(14, 165, 233, 0.1); color: #0ea5e9; border-radius: 20px; font-weight: 600; font-size: 0.85rem; margin-bottom: 2rem;">
             {user['role'].upper()} ACCESS
         </div>
-        <div style="opacity: 0.8; margin-bottom: 1rem;">
-            Use the sidebar to navigate through your projects and dashboards.
+        <div style="opacity: 0.8; margin-bottom: 1.5rem;">
+            Welcome to the Strat Edge Project Performance Portal.
         </div>
-        <div style="background: rgba(44, 90, 160, 0.1); padding: 1rem; border-radius: 8px; margin-top: 1rem; border: 1px dashed rgba(95, 162, 232, 0.4);">
-            <div style="font-weight: 600; color: #5fa2e8; font-size: 0.9rem;">New Template Available!</div>
-            <div style="font-size: 0.8rem; opacity: 0.9;">I've updated the Project Template with the new columns: <br><b>Responsible (Username)</b> and <b>Expected Output</b>.</div>
-            <div style="font-size: 0.75rem; margin-top: 5px; opacity: 0.7;">Location: <code>DASHBOARD/templates/Project_Template.xlsx</code></div>
+        <div style="background: rgba(12, 74, 110, 0.2); padding: 1.5rem; border-radius: 12px; margin-top: 1rem; border: 1px dashed rgba(14, 165, 233, 0.4);">
+            <div style="font-weight: 700; color: #38bdf8; font-size: 0.95rem; margin-bottom: 4px;">STRAT EDGE SOLUTIONS</div>
+            <div style="font-size: 0.8rem; font-style: italic; opacity: 0.9;">"Turning Insight into Advantage"</div>
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -61,33 +60,35 @@ def login_view():
     # Inject trigger to hide sidebar at login
     st.markdown('<div class="hide-sidebar"></div>', unsafe_allow_html=True)
     
-    # Direct link for FontAwesome to ensure it loads
-    st.markdown('<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">', unsafe_allow_html=True)
-    
-    # --- BRANDING ---
-    st.markdown("""
-        <div style="text-align: center; margin-bottom: 2rem; margin-top: 3rem;">
-            <div style="background: linear-gradient(135deg, #2c5aa0 0%, #5fa2e8 100%); 
-                        -webkit-background-clip: text; -webkit-text-fill-color: transparent; 
-                        font-size: 3.5rem; font-weight: 800; letter-spacing: -2px;">
-                PM PORTAL
-            </div>
-            <p style="color: grey; font-size: 1.1rem; font-weight: 500; opacity: 0.9;">
-                Enterprise Project Performance Dashboard
-            </p>
-        </div>
-    """, unsafe_allow_html=True)
-
     # Center the form and constrain width - Narrower layout
     col_space1, col_form, col_space2 = st.columns([1.5, 2, 1.5])
     
     with col_form:
+        # BRAND LOGO INSIDE COLUMN
+        c_left, c_mid, c_right = st.columns([1, 2, 1])
+        with c_mid:
+            st.image("image/image.png", width=180)
+        
+        st.markdown("""
+            <div style="text-align: center; margin-top: -10px; margin-bottom: 20px;">
+                <div style="color: white; font-size: 1.8rem; font-weight: 800; letter-spacing: -1px; line-height: 1;">
+                    STRAT EDGE
+                </div>
+                <div style="color: #38bdf8; font-size: 1rem; font-weight: 600; letter-spacing: 2px; margin-top: 5px;">
+                    PROJECT PORTAL
+                </div>
+                <div style="color: #94a3b8; font-size: 0.75rem; font-style: italic; margin-top: 8px; opacity: 0.8;">
+                    "Turning Insight into Advantage"
+                </div>
+            </div>
+        """, unsafe_allow_html=True)
+
         # Tabs for Login/Signup
         tab_login, tab_signup = st.tabs(["LOGIN", "REGISTER"])
         
         with tab_login:
             with st.form("login_form", clear_on_submit=False):
-                st.markdown("### Welcome Back")
+                st.markdown('<div style="color: #38bdf8; font-size: 1.5rem; font-weight: 700; margin-bottom: 10px;">Welcome Back</div>', unsafe_allow_html=True)
                 username = st.text_input("Username")
                 password = st.text_input("Password", type="password")
                 st.markdown('<div class="exec-btn">', unsafe_allow_html=True)
