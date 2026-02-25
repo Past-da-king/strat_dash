@@ -1,48 +1,46 @@
-import psycopg2
-from psycopg2.extras import RealDictCursor
-import pandas as pd
-import streamlit as st
-import os
-
-UPLOADS_DIR = os.path.join(os.path.dirname(__file__), 'uploads')
-
 import sqlite3
 import pandas as pd
 import streamlit as st
 import os
+import re
 
-# --- DATABASE TOGGLE ---
-USE_LOCAL_SQLITE = True  # Set to False to switch back to Neon PostgreSQL
+# --- DATABASE CONFIG ---
 SQLITE_DB_PATH = os.path.join(os.path.dirname(__file__), 'pm_tool.db')
 UPLOADS_DIR = os.path.join(os.path.dirname(__file__), 'uploads')
 
 def get_connection():
     """Create a connection to the local SQLite database."""
     conn = sqlite3.connect(SQLITE_DB_PATH, check_same_thread=False)
-    conn.row_factory = sqlite3.Row  # This makes results act like dictionaries
+    conn.row_factory = sqlite3.Row  # Makes results act like dictionaries
     return conn
 
 def execute_query(query, params=(), commit=False):
-    """Executes a query against the local SQLite database."""
-    # Automatic placeholder conversion for compatibility
+    """Executes a query with automatic PostgreSQL-to-SQLite translation."""
+    # 1. Translate placeholders: %s -> ?
     query = query.replace('%s', '?')
+    
+    # 2. SQLite Compatibility: Remove 'RETURNING ...' clauses
+    # SQLite 3.35+ supports RETURNING, but python's sqlite3 driver requires 
+    # fetching the result before committing, which causes the "statements in progress" error.
+    # We strip it and use cursor.lastrowid instead.
+    query = re.sub(r'\s+RETURNING\s+\w+', '', query, flags=re.IGNORECASE)
     
     conn = get_connection()
     try:
         cursor = conn.cursor()
         cursor.execute(query, params)
+        
         if commit:
-            # For RETURNING-style queries in SQLite, we might need the ID
             last_id = cursor.lastrowid
             conn.commit()
-            # Only clear cache if we are inside a Streamlit session
+            # Only clear cache if inside a Streamlit session
             try:
                 st.cache_data.clear()
             except:
                 pass 
             return last_id
         else:
-            # IMPORTANT: Fetch all results immediately to avoid "statements in progress" errors
+            # Fetch everything immediately to close the result set
             results = [dict(row) for row in cursor.fetchall()]
             return results
     except Exception as e:
@@ -78,7 +76,7 @@ def get_user_by_username(username):
 def create_user(data):
     query = '''
     INSERT INTO users (username, password_hash, role, full_name, status)
-    VALUES (%s, %s, %s, %s, %s) RETURNING user_id
+    VALUES (%s, %s, %s, %s, %s)
     '''
     params = (data['username'], data['password_hash'], data['role'], data['full_name'], data.get('status', 'approved'))
     return execute_query(query, params, commit=True)
@@ -109,9 +107,15 @@ def assign_user_to_project(project_id, user_id, role, assigned_by):
     query = '''
     INSERT INTO project_assignments (project_id, user_id, assigned_role, assigned_by)
     VALUES (%s, %s, %s, %s)
-    ON CONFLICT (project_id, user_id) DO UPDATE SET assigned_role = EXCLUDED.assigned_role, assigned_by = EXCLUDED.assigned_by
     '''
-    execute_query(query, (project_id, user_id, role, assigned_by), commit=True)
+    # SQLite doesn't support the complex ON CONFLICT ... DO UPDATE in one line as easily
+    # Check if exists first
+    existing = execute_query("SELECT 1 FROM project_assignments WHERE project_id = %s AND user_id = %s", (project_id, user_id))
+    if existing:
+        execute_query("UPDATE project_assignments SET assigned_role = %s, assigned_by = %s WHERE project_id = %s AND user_id = %s",
+                     (role, assigned_by, project_id, user_id), commit=True)
+    else:
+        execute_query(query, (project_id, user_id, role, assigned_by), commit=True)
 
 def remove_user_from_project(project_id, user_id):
     execute_query("DELETE FROM project_assignments WHERE project_id = %s AND user_id = %s", (project_id, user_id), commit=True)
@@ -140,7 +144,7 @@ def get_project_users(project_id):
 def create_project(data, user_id):
     query = '''
     INSERT INTO projects (project_name, project_number, client, pm_user_id, total_budget, start_date, target_end_date, created_by)
-    VALUES (%s, %s, %s, %s, %s, %s, %s, %s) RETURNING project_id
+    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
     '''
     params = (
         data['project_name'], data['project_number'], data.get('client'),
@@ -206,7 +210,7 @@ def update_activity_status(activity_id, new_status, user_id):
 def update_activity_log(activity_id, event_type, event_date, user_id):
     query = '''
     INSERT INTO activity_log (activity_id, event_type, event_date, recorded_by)
-    VALUES (%s, %s, %s, %s) RETURNING log_id
+    VALUES (%s, %s, %s, %s)
     '''
     log_id = execute_query(query, (activity_id, event_type, event_date, user_id), commit=True)
     return log_id
@@ -217,7 +221,7 @@ def update_activity_log(activity_id, event_type, event_date, user_id):
 def add_expenditure(data, user_id):
     query = '''
     INSERT INTO expenditure_log (project_id, activity_id, category, description, reference_id, amount, spend_date, recorded_by)
-    VALUES (%s, %s, %s, %s, %s, %s, %s, %s) RETURNING exp_id
+    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
     '''
     params = (
         data['project_id'], data.get('activity_id'), data['category'],
@@ -233,7 +237,7 @@ def add_expenditure(data, user_id):
 def add_baseline_activity(data):
     query = '''
     INSERT INTO baseline_schedule (project_id, activity_name, planned_start, planned_finish, budgeted_cost, responsible_user_id, expected_output)
-    VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING activity_id
+    VALUES (%s, %s, %s, %s, %s, %s, %s)
     '''
     params = (
         data['project_id'], data['activity_name'], data['planned_start'],
@@ -276,7 +280,7 @@ def get_project_risks(project_id):
 def add_risk(data, user_id):
     query = '''
     INSERT INTO risks (project_id, activity_id, date_identified, description, impact, status, mitigation_action, recorded_by)
-    VALUES (%s, %s, %s, %s, %s, %s, %s, %s) RETURNING risk_id
+    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
     '''
     params = (
         data['project_id'], data.get('activity_id'), data.get('date_identified'), data['description'],
@@ -295,7 +299,7 @@ def save_task_output(activity_id, file_name, file_path, user_id, doc_type='Regul
     """Insert a completed output entry into task_outputs."""
     query = '''
     INSERT INTO task_outputs (activity_id, file_name, file_path, doc_type, uploaded_by)
-    VALUES (%s, %s, %s, %s, %s) RETURNING output_id
+    VALUES (%s, %s, %s, %s, %s)
     '''
     return execute_query(query, (activity_id, file_name, file_path, doc_type, user_id), commit=True)
 

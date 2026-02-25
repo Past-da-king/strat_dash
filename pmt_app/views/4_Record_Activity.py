@@ -5,6 +5,7 @@ import pandas as pd
 from datetime import datetime
 import os
 import styles
+import base64
 
 # Page Config
 st.set_page_config(page_title="PM Tool - Record Activity", layout="wide")
@@ -184,75 +185,66 @@ def record_activity_page():
         status = row['status'] or 'Not Started'
         
         with st.container(border=True):
-            # 1. Header Row
-            c1, c2 = st.columns([3, 1])
-            with c1:
-                st.markdown(f'<div class="op-title">{row["activity_name"]}</div>', unsafe_allow_html=True)
-                st.markdown(f'<div class="op-meta"><i class="far fa-calendar-alt"></i> Planned: {row["planned_start"].strftime("%d %b %Y")} &mdash; {row["planned_finish"]}</div>', unsafe_allow_html=True)
-                
-                badges_html = f'<div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:8px;">'
+            # --- EVEN MORE COMPACT HORIZONTAL LAYOUT ---
+            main_col1, main_col2, main_col3 = st.columns([2.5, 1.5, 2.0])
+            
+            with main_col1:
+                st.markdown(f"""
+                    <div style="display:flex; align-items:center; gap:10px; margin-bottom:4px;">
+                        <div class="op-title" style="margin-bottom:0;">{row["activity_name"]}</div>
+                    </div>
+                    <div style="display:flex; gap:8px; align-items:center;">
+                        <span class="badge {'badge-status-complete' if status == 'Complete' else ('badge-status-active' if status == 'Active' else 'badge-status-pending')}" style="margin:0;">
+                            {status.upper()}
+                        </span>
+                        <div class="op-meta" style="margin:0;"><i class="far fa-calendar-alt"></i> {row["planned_start"].strftime("%d %b")} - {row["planned_finish"]}</div>
+                    </div>
+                """, unsafe_allow_html=True)
+            
+            with main_col2:
                 resp_name = row.get('responsible_name')
                 display_name = resp_name if pd.notna(resp_name) and resp_name else "Unassigned"
-                badges_html += f'<span class="badge badge-user"><i class="fas fa-user-circle"></i> Assigned to: {display_name}</span>'
-                
-                if row.get('expected_output'):
-                    badges_html += f'<span class="badge badge-output"><i class="fas fa-clipboard-list"></i> {row["expected_output"]}</span>'
-                badges_html += '</div>'
-                st.markdown(badges_html, unsafe_allow_html=True)
-            
-            with c2:
-                status_class = "badge-status-complete" if status == "Complete" else ("badge-status-active" if status == "Active" else "badge-status-pending")
-                st.markdown(f'<div style="text-align:right;"><span class="badge {status_class}">{status.upper()}</span></div>', unsafe_allow_html=True)
-            
-            # 2. Action Area (Inside the border)
-            st.markdown('<div style="height:1px; background:rgba(128,128,128,0.1); margin:15px 0;"></div>', unsafe_allow_html=True)
-            
-            act_col1, act_col2 = st.columns([3, 1])
-            with act_col1:
-                if status == "Complete":
-                    outputs = database.get_task_outputs(row['activity_id'])
-                    if not outputs.empty:
-                        st.markdown('<div style="font-size:0.75rem; color:#34d399; font-weight:700; opacity:0.8; margin-bottom:8px;">SUBMITTED DELIVERABLES:</div>', unsafe_allow_html=True)
-                        for _, out in outputs.iterrows():
-                            file_full_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', out['file_path'])
-                            if os.path.exists(file_full_path):
-                                with open(file_full_path, "rb") as fp:
-                                    st.markdown('<div class="download-btn">', unsafe_allow_html=True)
-                                    st.download_button(
-                                        out['file_name'],
-                                        data=fp.read(),
-                                        file_name=out['file_name'],
-                                        key=f"dl_{out['output_id']}",
-                                        use_container_width=False
-                                    )
-                                    st.markdown('</div>', unsafe_allow_html=True)
-            
-            with act_col2:
+                st.markdown(f"""
+                    <div style="font-size:0.7rem; font-weight:600; color:#94a3b8; margin-bottom:2px; text-transform:uppercase;">Assignment</div>
+                    <div style="font-size:0.8rem; color:#e2e8f0; margin-bottom:6px;"><i class="fas fa-user-circle" style="color:#38bdf8;"></i> {display_name}</div>
+                    
+                    <div style="font-size:0.7rem; font-weight:600; color:#94a3b8; margin-bottom:2px; text-transform:uppercase;">Deliverable</div>
+                    <div style="font-size:0.8rem; color:#fbbf24; font-style:italic;"><i class="fas fa-file-contract"></i> {row.get('expected_output') or 'None'}</div>
+                """, unsafe_allow_html=True)
+
+            with main_col3:
+                # --- Actions Column (Side-by-Side) ---
                 if status == "Not Started":
                     st.markdown('<div class="upload-btn">', unsafe_allow_html=True)
                     if st.button("Start Phase", key=f"btn_{row['activity_id']}", use_container_width=True):
                         submit_document_dialog(row['activity_id'], row['activity_name'], "First Draft")
                     st.markdown('</div>', unsafe_allow_html=True)
-                    st.caption("⚠️ Requires First Draft")
+                    st.markdown('<div style="text-align:center; font-size:0.65rem; color:#ef4444; font-weight:700; margin-top:4px;">REQUIRES FIRST DRAFT</div>', unsafe_allow_html=True)
+                
                 elif status == "Active":
-                    # Check for open risks
                     has_risks = database.has_open_risks(row['activity_id'])
                     
-                    st.markdown('<div class="check-btn">', unsafe_allow_html=True)
                     if has_risks:
-                        st.warning("⚠️ Open Risks")
-                        if st.button("Complete", key=f"btn_{row['activity_id']}", use_container_width=True, type="secondary", disabled=True):
-                            pass
-                    else:
+                        st.markdown('<div style="background:rgba(239,68,68,0.1); border:1px solid #ef4444; border-radius:6px; padding:4px; text-align:center; margin-bottom:8px;">', unsafe_allow_html=True)
+                        st.markdown('<div style="color:#ef4444; font-size:0.7rem; font-weight:700;"><i class="fas fa-exclamation-triangle"></i> OPEN RISKS LINKED</div>', unsafe_allow_html=True)
+                        st.markdown('</div>', unsafe_allow_html=True)
+                    
+                    # SIDE-BY-SIDE BUTTONS
+                    btn_c1, btn_c2 = st.columns(2)
+                    with btn_c1:
+                        st.markdown('<div class="add-btn">', unsafe_allow_html=True)
+                        if st.button("Upload Draft", key=f"draft_{row['activity_id']}", use_container_width=True):
+                            submit_document_dialog(row['activity_id'], row['activity_name'], "Regular Draft")
+                        st.markdown('</div>', unsafe_allow_html=True)
+                    
+                    with btn_c2:
+                        st.markdown('<div class="check-btn">', unsafe_allow_html=True)
+                        # REMOVED HARD GATE: button is no longer disabled by has_risks
                         if st.button("Complete", key=f"btn_{row['activity_id']}", use_container_width=True, type="primary"):
                             submit_document_dialog(row['activity_id'], row['activity_name'], "Final Document")
-                    st.markdown('</div>', unsafe_allow_html=True)
-                    
-                    st.markdown('<div class="add-btn">', unsafe_allow_html=True)
-                    if st.button("Upload Draft", key=f"draft_{row['activity_id']}", use_container_width=True):
-                        submit_document_dialog(row['activity_id'], row['activity_name'], "Regular Draft")
-                    st.markdown('</div>', unsafe_allow_html=True)
-                else:
+                        st.markdown('</div>', unsafe_allow_html=True)
+                
+                elif status == "Complete":
                     is_privileged = current_user['role'] in ['admin', 'pm', 'executive']
                     if is_privileged:
                         st.markdown('<div class="refresh-btn">', unsafe_allow_html=True)
@@ -261,11 +253,42 @@ def record_activity_page():
                             st.rerun()
                         st.markdown('</div>', unsafe_allow_html=True)
                     else:
-                        st.markdown('<div class="check-btn">', unsafe_allow_html=True)
+                        st.markdown('<div class="check-btn" style="opacity:0.5;">', unsafe_allow_html=True)
                         st.button("Done", disabled=True, key=f"btn_{row['activity_id']}", use_container_width=True)
                         st.markdown('</div>', unsafe_allow_html=True)
+
+            # Sub-row for existing deliverables (if any)
+            if status != "Not Started":
+                outputs = database.get_task_outputs(row['activity_id'])
+                if not outputs.empty:
+                    st.markdown('<div style="height:10px;"></div>', unsafe_allow_html=True)
+                    with st.expander(f"VIEW SUBMITTED DOCUMENTS ({len(outputs)})", expanded=False, icon=":material/folder_open:"):
+                        # List links vertically for a cleaner "File Explorer" feel
+                        for _, out in outputs.iterrows():
+                            file_full_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', out['file_path'])
+                            if os.path.exists(file_full_path):
+                                with open(file_full_path, "rb") as f:
+                                    data = f.read()
+                                b64 = base64.b64encode(data).decode()
+                                
+                                # Determine icon based on doc_type or filename
+                                icon = "fa-file-pdf" if out['file_name'].endswith('.pdf') else "fa-file-alt"
+                                label_color = "#34d399" if out.get('doc_type') == 'Final Document' else "#38bdf8"
+                                
+                                st.markdown(f"""
+                                    <div style="margin-bottom: 8px; display: flex; align-items: center; gap: 10px;">
+                                        <i class="fas {icon}" style="color: {label_color};"></i>
+                                        <a href="data:application/octet-stream;base64,{b64}" download="{out['file_name']}" 
+                                           style="color: {label_color}; text-decoration: none; font-size: 0.85rem; font-weight: 500;">
+                                           {out['file_name']}
+                                        </a>
+                                        <span style="font-size: 0.7rem; color: #94a3b8; margin-left: auto;">
+                                            Uploaded by {out['uploader_name']} on {str(out['uploaded_at'])[:10]}
+                                        </span>
+                                    </div>
+                                """, unsafe_allow_html=True)
         
-        st.markdown('<div style="height:10px;"></div>', unsafe_allow_html=True)
+        st.markdown('<div style="height:5px;"></div>', unsafe_allow_html=True)
 
     # Activity Audit Log
     with st.expander("Activity Audit Log (History)"):
