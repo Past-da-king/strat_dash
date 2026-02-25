@@ -14,6 +14,15 @@ def executive_dashboard():
     auth.require_role(['admin', 'executive'])
     styles.global_css()
     
+    # --- Sidebar Controls ---
+    with st.sidebar:
+        st.header("Dashboard Controls")
+        st.markdown('<div class="refresh-btn">', unsafe_allow_html=True)
+        if st.button("Refresh Data", use_container_width=True, type="primary"):
+            st.cache_data.clear()
+            st.rerun()
+        st.markdown('</div>', unsafe_allow_html=True)
+
     # --- Header ---
     st.markdown("""
     <div style="background: linear-gradient(135deg, #0c4a6e 0%, #0ea5e9 100%); color: white; padding: 2rem; border-radius: 12px; margin-bottom: 2rem; box-shadow: 0 4px 12px rgba(12, 74, 110, 0.2);">
@@ -34,7 +43,7 @@ def executive_dashboard():
     
     # --- Portfolio Summary Metrics ---
     total_projects = len(projects)
-    total_budget = projects['total_budget'].sum() if 'total_budget' in projects.columns else 0
+    total_budget = pd.to_numeric(projects['total_budget'], errors='coerce').sum() if 'total_budget' in projects.columns else 0
     
     # Gather metrics for all projects
     all_metrics = []

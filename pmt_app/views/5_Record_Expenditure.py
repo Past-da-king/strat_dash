@@ -96,7 +96,7 @@ def record_exp_page():
     st.divider()
     
     # Quick Summary Metric
-    current_exps = database.get_df("SELECT SUM(amount) as total FROM expenditure_log WHERE project_id = ?", (project_id,))
+    current_exps = database.get_df("SELECT SUM(amount) as total FROM expenditure_log WHERE project_id = %s", (project_id,))
     total_val = current_exps['total'].iloc[0] if not current_exps.empty and current_exps['total'].iloc[0] else 0.0
     st.metric(label="Total Recorded Expenditure (Current Project)", value=f"R {total_val:,.2f}")
 
@@ -105,7 +105,7 @@ def record_exp_page():
         SELECT el.spend_date, el.category, el.amount, el.reference_id, el.description, u.full_name as recorded_by
         FROM expenditure_log el
         JOIN users u ON el.recorded_by = u.user_id
-        WHERE el.project_id = ?
+        WHERE el.project_id = %s
         ORDER BY el.exp_id DESC
     ''', (project_id,))
     

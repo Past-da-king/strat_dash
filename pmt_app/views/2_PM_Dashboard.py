@@ -127,6 +127,7 @@ def pm_dashboard():
         st.header("Dashboard Controls")
         st.markdown('<div class="refresh-btn">', unsafe_allow_html=True)
         if st.button("Refresh Data", use_container_width=True, type="primary"):
+            st.cache_data.clear()
             st.rerun()
         st.markdown('</div>', unsafe_allow_html=True)
         
@@ -248,7 +249,7 @@ def pm_dashboard():
     def show_full_financials(project_id):
         df = database.get_df('''
             SELECT spend_date, category, amount, reference_id, description 
-            FROM expenditure_log WHERE project_id = ? ORDER BY spend_date DESC
+            FROM expenditure_log WHERE project_id = %s ORDER BY spend_date DESC
         ''', (project_id,))
         if df.empty:
             st.info("No expenditure recorded for this project yet.")
@@ -360,7 +361,7 @@ def pm_dashboard():
 
     with r2_col2:
         st.markdown("### Cost Breakdown")
-        exp_df = database.get_df("SELECT category, SUM(amount) as total FROM expenditure_log WHERE project_id = ? GROUP BY category", (project_id,))
+        exp_df = database.get_df("SELECT category, SUM(amount) as total FROM expenditure_log WHERE project_id = %s GROUP BY category", (project_id,))
         if not exp_df.empty:
             cost_fig = px.pie(exp_df, values='total', names='category', hole=0.7,
                              color='category',
@@ -391,7 +392,7 @@ def pm_dashboard():
                (CASE WHEN bs.status IN ('Active', 'Complete') THEN 1 ELSE 0 END) as is_started
         FROM baseline_schedule bs
         LEFT JOIN users u ON bs.responsible_user_id = u.user_id
-        WHERE bs.project_id = ? ORDER BY bs.planned_start
+        WHERE bs.project_id = %s ORDER BY bs.planned_start
     ''', (project_id,))
 
     # --- ROW 3: TIMELINE & MILESTONES ---

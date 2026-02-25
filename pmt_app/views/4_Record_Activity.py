@@ -251,7 +251,7 @@ def record_activity_page():
             FROM activity_log al
             JOIN baseline_schedule bs ON al.activity_id = bs.activity_id
             JOIN users u ON al.recorded_by = u.user_id
-            WHERE bs.project_id = ?
+            WHERE bs.project_id = %s
             ORDER BY al.log_id DESC
         ''', (project_id,))
         if not logs.empty:

@@ -66,7 +66,7 @@ def import_project(file, user_id):
         # Insert into baseline_schedule
         query = '''
         INSERT INTO baseline_schedule (project_id, activity_name, planned_start, planned_finish, budgeted_cost, depends_on, responsible_user_id, expected_output, status)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
         '''
         activity_id = database.execute_query(query, (project_id, activity_name, p_start, p_end, budget, depends, responsible_user_id, expected_output, status), commit=True)
         

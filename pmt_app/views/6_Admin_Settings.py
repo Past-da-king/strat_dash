@@ -159,7 +159,7 @@ def admin_settings_page():
             
             st.markdown('<div class="save-btn">', unsafe_allow_html=True)
             if st.button("Update Project Team", use_container_width=True):
-                database.execute_query("DELETE FROM project_assignments WHERE project_id = ? AND assigned_role != 'pm'", (p_id,), commit=True)
+                database.execute_query("DELETE FROM project_assignments WHERE project_id = %s AND assigned_role != 'pm'", (p_id,), commit=True)
                 for uid in new_team:
                     database.assign_user_to_project(p_id, uid, 'team', auth.get_current_user()['id'])
                 st.success("Team assignments updated!")
@@ -201,7 +201,7 @@ def admin_settings_page():
                     new_resp_id = resp_user_map.get(new_resp_name) if new_resp_name != "Unassigned" else None
                     
                     database.execute_query(
-                        "UPDATE baseline_schedule SET responsible_user_id = ? WHERE activity_id = ?",
+                        "UPDATE baseline_schedule SET responsible_user_id = %s WHERE activity_id = %s",
                         (new_resp_id, row['activity_id']),
                         commit=True
                     )

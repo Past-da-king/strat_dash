@@ -6,13 +6,17 @@ import os
 import base64
 from pathlib import Path
 
-# Portable logo — encoded as base64 data URI for platform-independent HTML embedding
-LOGO_PATH = Path(__file__).parent / "image" / "image.png"
-with open(LOGO_PATH, "rb") as _f:
-    LOGO_BYTES = _f.read()
-LOGO_B64 = base64.b64encode(LOGO_BYTES).decode()
-
 # Page Config (Set this first)
+@st.cache_resource
+def get_logo_data():
+    LOGO_PATH = Path(__file__).parent / "image" / "image.png"
+    with open(LOGO_PATH, "rb") as _f:
+        bytes_data = _f.read()
+    b64_data = base64.b64encode(bytes_data).decode()
+    return bytes_data, b64_data
+
+LOGO_BYTES, LOGO_B64 = get_logo_data()
+
 st.set_page_config(
     page_title="Strat Edge Project Portal",
     page_icon=LOGO_BYTES,

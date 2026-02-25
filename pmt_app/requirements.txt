@@ -7,3 +7,4 @@ matplotlib
 seaborn
 reportlab
 pdfrw
+psycopg2-binary

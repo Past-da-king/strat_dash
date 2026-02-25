@@ -51,7 +51,7 @@ def admin_panel():
                     else:
                         try:
                             database.execute_query(
-                                "INSERT INTO users (username, password_hash, role, full_name, status) VALUES (?, ?, ?, ?, ?)",
+                                "INSERT INTO users (username, password_hash, role, full_name, status) VALUES (%s, %s, %s, %s, %s)",
                                 (new_user, generate_password_hash(new_pass), new_role, new_name, 'approved'),
                                 commit=True
                             )
