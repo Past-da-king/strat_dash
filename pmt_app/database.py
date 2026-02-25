@@ -6,56 +6,55 @@ import os
 
 UPLOADS_DIR = os.path.join(os.path.dirname(__file__), 'uploads')
 
-from psycopg2 import pool
+import sqlite3
+import pandas as pd
+import streamlit as st
+import os
 
-@st.cache_resource(show_spinner=False)
-def get_pool():
-    """Create a thread-safe connection pool using Streamlit cache."""
-    # Add a timeout to the connection URL to prevent 'forever' hangs
-    db_url = st.secrets["database"]["url"]
-    if "?" in db_url:
-        db_url += "&connect_timeout=5"
-    else:
-        db_url += "?connect_timeout=5"
-        
-    return pool.ThreadedConnectionPool(1, 20, db_url)
+# --- DATABASE TOGGLE ---
+USE_LOCAL_SQLITE = True  # Set to False to switch back to Neon PostgreSQL
+SQLITE_DB_PATH = os.path.join(os.path.dirname(__file__), 'pm_tool.db')
+UPLOADS_DIR = os.path.join(os.path.dirname(__file__), 'uploads')
+
+def get_connection():
+    """Create a connection to the local SQLite database."""
+    conn = sqlite3.connect(SQLITE_DB_PATH, check_same_thread=False)
+    conn.row_factory = sqlite3.Row  # This makes results act like dictionaries
+    return conn
 
 def execute_query(query, params=(), commit=False):
-    """Executes a query by leasing a connection from the pool, then returning it."""
+    """Executes a query against the local SQLite database."""
+    # Automatic placeholder conversion for compatibility
+    query = query.replace('%s', '?')
+    
+    conn = get_connection()
     try:
-        db_pool = get_pool()
-        conn = db_pool.getconn()
-    except Exception:
-        st.error("⚠️ **Database Unavailable**: Connection to the server timed out. Please check your internet or VPN.")
-        st.stop()
-        return None
-
-    try:
-        # Use RealDictCursor to act like sqlite3.Row
-        with conn.cursor(cursor_factory=RealDictCursor) as cursor:
-            cursor.execute(query, params)
-            if commit:
-                conn.commit()
-                # Clear cache on data modification (optional: narrow it down by table)
+        cursor = conn.cursor()
+        cursor.execute(query, params)
+        if commit:
+            # For RETURNING-style queries in SQLite, we might need the ID
+            last_id = cursor.lastrowid
+            conn.commit()
+            # Only clear cache if we are inside a Streamlit session
+            try:
                 st.cache_data.clear()
-                try:
-                    result = cursor.fetchone()
-                    return result[list(result.keys())[0]] if result else None
-                except Exception:
-                    return None
-            else:
-                return cursor.fetchall()
+            except:
+                pass 
+            return last_id
+        else:
+            # IMPORTANT: Fetch all results immediately to avoid "statements in progress" errors
+            results = [dict(row) for row in cursor.fetchall()]
+            return results
     except Exception as e:
-        conn.rollback()
+        if commit: conn.rollback()
         raise e
     finally:
-        # RETURN the connection to the pool, do NOT close it!
-        db_pool.putconn(conn)
+        cursor.close()
+        conn.close()
 
-@st.cache_data(ttl=600) # Cache for 10 minutes
+@st.cache_data(ttl=600)
 def get_df(query, params=()):
     try:
-        # Use existing execute_query to get a list of dicts
         results = execute_query(query, params)
         return pd.DataFrame(results)
     except Exception as e:
@@ -264,33 +263,46 @@ def get_baseline_schedule(project_id, user_id_filter=None):
 # Risk Management
 # ============================================================
 def get_project_risks(project_id):
-    return get_df("SELECT * FROM risks WHERE project_id = %s ORDER BY date_identified DESC", (project_id,))
+    query = '''
+        SELECT r.*, bs.activity_name, u.full_name as responsible_name
+        FROM risks r
+        LEFT JOIN baseline_schedule bs ON r.activity_id = bs.activity_id
+        LEFT JOIN users u ON bs.responsible_user_id = u.user_id
+        WHERE r.project_id = %s
+        ORDER BY r.date_identified DESC
+    '''
+    return get_df(query, (project_id,))
 
 def add_risk(data, user_id):
     query = '''
-    INSERT INTO risks (project_id, date_identified, description, impact, status, mitigation_action, recorded_by)
-    VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING risk_id
+    INSERT INTO risks (project_id, activity_id, date_identified, description, impact, status, mitigation_action, recorded_by)
+    VALUES (%s, %s, %s, %s, %s, %s, %s, %s) RETURNING risk_id
     '''
     params = (
-        data['project_id'], data.get('date_identified'), data['description'],
+        data['project_id'], data.get('activity_id'), data.get('date_identified'), data['description'],
         data.get('impact'), data.get('status', 'Open'), data.get('mitigation_action'), user_id
     )
     return execute_query(query, params, commit=True)
 
-def update_risk_status(risk_id, new_status, user_id):
-    query = "UPDATE risks SET status = %s, recorded_by = %s WHERE risk_id = %s"
-    return execute_query(query, (new_status, user_id, risk_id), commit=True)
+def update_risk_status(risk_id, new_status, user_id, closure_file_path=None):
+    query = "UPDATE risks SET status = %s, recorded_by = %s, closure_file_path = %s WHERE risk_id = %s"
+    return execute_query(query, (new_status, user_id, closure_file_path, risk_id), commit=True)
 
 # ============================================================
 # Task Outputs
 # ============================================================
-def save_task_output(activity_id, file_name, file_path, user_id):
+def save_task_output(activity_id, file_name, file_path, user_id, doc_type='Regular Draft'):
     """Insert a completed output entry into task_outputs."""
     query = '''
-    INSERT INTO task_outputs (activity_id, file_name, file_path, uploaded_by)
-    VALUES (%s, %s, %s, %s) RETURNING output_id
+    INSERT INTO task_outputs (activity_id, file_name, file_path, doc_type, uploaded_by)
+    VALUES (%s, %s, %s, %s, %s) RETURNING output_id
     '''
-    return execute_query(query, (activity_id, file_name, file_path, user_id), commit=True)
+    return execute_query(query, (activity_id, file_name, file_path, doc_type, user_id), commit=True)
+
+def check_task_document_presence(activity_id, doc_type):
+    """Check if a specific type of document has been uploaded for a task."""
+    res = execute_query("SELECT COUNT(*) as cnt FROM task_outputs WHERE activity_id = %s AND doc_type = %s", (activity_id, doc_type))
+    return res[0]['cnt'] > 0 if res else False
 
 def get_task_outputs(activity_id):
     """Fetch all outputs linked to a specific task."""
@@ -312,3 +324,8 @@ def get_all_outputs_for_project(project_id):
         WHERE bs.project_id = %s
         ORDER BY to2.uploaded_at DESC
     ''', (project_id,))
+
+def has_open_risks(activity_id):
+    """Check if there are any open risks linked to this activity."""
+    res = execute_query("SELECT COUNT(*) as cnt FROM risks WHERE activity_id = %s AND status = 'Open'", (activity_id,))
+    return res[0]['cnt'] > 0 if res else False

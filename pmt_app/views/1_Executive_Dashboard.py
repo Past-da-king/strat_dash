@@ -34,26 +34,23 @@ def executive_dashboard():
     </div>
     """, unsafe_allow_html=True)
     
-    # Get all projects
-    projects = database.get_projects(pm_id=None)
+    # Get all projects and metrics in ONE query
+    user = auth.get_current_user()
+    is_global = user['role'] in ['admin', 'executive']
+    all_metrics = calculations.get_portfolio_metrics(
+        pm_id=None if is_global else user['id'],
+        user_id=user['id']
+    )
     
-    if projects.empty:
+    if not all_metrics:
         st.info("No projects found in the system.")
         st.stop()
     
     # --- Portfolio Summary Metrics ---
-    total_projects = len(projects)
-    total_budget = pd.to_numeric(projects['total_budget'], errors='coerce').sum() if 'total_budget' in projects.columns else 0
-    
-    # Gather metrics for all projects
-    all_metrics = []
-    for _, proj in projects.iterrows():
-        m = calculations.get_project_metrics(proj['project_id'])
-        if m:
-            all_metrics.append(m)
-    
-    total_spent = sum(m['total_spent'] for m in all_metrics) if all_metrics else 0
-    avg_completion = sum(m['pct_complete'] for m in all_metrics) / len(all_metrics) if all_metrics else 0
+    total_projects = len(all_metrics)
+    total_budget = sum(m['total_budget'] for m in all_metrics)
+    total_spent = sum(m['total_spent'] for m in all_metrics)
+    avg_completion = sum(m['pct_complete'] for m in all_metrics) / total_projects if total_projects > 0 else 0
     
     s1, s2, s3, s4 = st.columns(4)
     s1.metric("Total Projects", total_projects)

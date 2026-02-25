@@ -28,6 +28,7 @@ def home_view():
     """The default home view after login."""
     styles.global_css()
     user = auth.get_current_user()
+    role = user['role']
     
     st.markdown(f"""
     <div style="background: rgba(255, 255, 255, 0.05); padding: 2.5rem; border-radius: 16px; border: 1px solid rgba(128, 128, 128, 0.2); box-shadow: 0 4px 20px rgba(0,0,0,0.1); text-align: center; margin-top: 2rem;">
@@ -48,22 +49,34 @@ def home_view():
     
     st.markdown('<div style="height:20px"></div>', unsafe_allow_html=True)
     
-    c1, c2, c3 = st.columns(3)
-    with c1:
-        st.markdown('<div class="exec-btn">', unsafe_allow_html=True)
-        if st.button("Executive Overview", use_container_width=True):
-            st.switch_page("views/1_Executive_Dashboard.py")
-        st.markdown('</div>', unsafe_allow_html=True)
-    with c2:
-        st.markdown('<div class="pm-btn">', unsafe_allow_html=True)
-        if st.button("Project Management", use_container_width=True):
-            st.switch_page("views/2_PM_Dashboard.py")
-        st.markdown('</div>', unsafe_allow_html=True)
-    with c3:
+    # Role-based quick navigation
+    btns = []
+    if role in ['admin', 'executive']:
+        btns.append(("Executive Portfolio", "views/1_Executive_Dashboard.py", "exec-btn"))
+        btns.append(("Project Dashboard", "views/2_PM_Dashboard.py", "pm-btn"))
+        btns.append(("Admin Panel", "views/6_Admin_Panel.py", "add-btn"))
+    elif role == 'pm':
+        btns.append(("Project Dashboard", "views/2_PM_Dashboard.py", "pm-btn"))
+        btns.append(("Project Setup", "views/3_Project_Setup.py", "add-btn"))
+        btns.append(("Record Activity", "views/4_Record_Activity.py", "exec-btn"))
+    else: # team
+        btns.append(("Project Dashboard", "views/2_PM_Dashboard.py", "pm-btn"))
+        btns.append(("Record Activity", "views/4_Record_Activity.py", "exec-btn"))
+        btns.append(("Risk Register", "views/5_Risk_Register.py", "pm-btn"))
+
+    # Render buttons
+    cols = st.columns(len(btns) + 1)
+    for i, (label, page, css_class) in enumerate(btns):
+        with cols[i]:
+            st.markdown(f'<div class="{css_class}">', unsafe_allow_html=True)
+            if st.button(label, use_container_width=True, key=f"nav_{i}"):
+                st.switch_page(page)
+            st.markdown('</div>', unsafe_allow_html=True)
+            
+    with cols[-1]:
         st.markdown('<div class="logout-btn">', unsafe_allow_html=True)
-        if st.button("Logout", type="primary", use_container_width=True):
+        if st.button("Logout", type="primary", use_container_width=True, key="nav_logout"):
             auth.logout()
-            st.rerun()
         st.markdown('</div>', unsafe_allow_html=True)
 
 def login_view():
@@ -178,8 +191,10 @@ def main():
         if role in ['admin', 'executive']:
             pages.append(exec_dash)
             
-        if role in ['pm', 'admin', 'executive']:
+        if role in ['pm', 'admin', 'executive', 'team']:
             pages.append(pm_dash)
+            
+        if role in ['pm', 'admin', 'executive']:
             pages.append(proj_setup)
             
         # Everyone (team, pm, admin, executive) gets these

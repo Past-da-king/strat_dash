@@ -44,26 +44,57 @@ def risk_register_page():
     st.divider()
 
     # A. Add New Risk Form
-    with st.expander("Log New Risk / Issue", expanded=True):
-        col_s1, col_center, col_s2 = st.columns([1, 2, 1])
-        with col_center:
-            with st.form("add_risk_form"):
-                r_desc = st.text_input("Risk/Issue Description")
-                c1, c2 = st.columns(2)
-                with c1:
-                    r_impact = st.selectbox("Impact Level", ["H", "M", "L"])
-                with c2:
-                    r_date = st.date_input("Date Identified", value=datetime.today())
-                
-                r_mitigation = st.text_area("Mitigation Plan")
-                
+    with st.expander("➕ LOG NEW PROJECT RISK / ISSUE", expanded=False):
+        st.markdown("""
+            <div style="background: rgba(14, 165, 233, 0.05); padding: 1.5rem; border-radius: 12px; border: 1px dashed rgba(14, 165, 233, 0.3); margin-bottom: 1rem;">
+                <div style="font-weight: 600; color: #38bdf8; font-size: 1.1rem; margin-bottom: 0.5rem;">Risk Identification</div>
+                <div style="font-size: 0.85rem; opacity: 0.8;">Fill in the details below to log a new risk or issue. Linking it to an activity ensures the right team member is notified.</div>
+            </div>
+        """, unsafe_allow_html=True)
+
+        # Fetch activities for linkage
+        activities = database.get_baseline_schedule(project_id)
+        activity_map = {"--- Project Level (No Specific Activity) ---": None}
+        if not activities.empty:
+            for _, act in activities.iterrows():
+                activity_map[f"{act['activity_name']} (Responsible: {act['responsible_name']})"] = act['activity_id']
+        
+        with st.form("add_risk_form", clear_on_submit=True):
+            # Row 1: Description
+            st.markdown('<div style="margin-bottom: -10px; font-size: 0.8rem; font-weight: 600; color: #94a3b8;">WHAT IS THE RISK?</div>', unsafe_allow_html=True)
+            r_desc = st.text_input("Description", placeholder="e.g., Delay in equipment delivery from vendor", label_visibility="collapsed")
+            
+            # Row 2: Linkage & Impact
+            c1, c2, c3 = st.columns([2, 1, 1])
+            with c1:
+                st.markdown('<div style="margin-bottom: 5px; font-size: 0.8rem; font-weight: 600; color: #94a3b8;"><i class="fas fa-link"></i> LINKED ACTIVITY</div>', unsafe_allow_html=True)
+                r_activity = st.selectbox("Activity", list(activity_map.keys()), label_visibility="collapsed")
+            with c2:
+                st.markdown('<div style="margin-bottom: 5px; font-size: 0.8rem; font-weight: 600; color: #94a3b8;"><i class="fas fa-exclamation-circle"></i> IMPACT</div>', unsafe_allow_html=True)
+                r_impact = st.selectbox("Impact", ["H", "M", "L"], index=1, label_visibility="collapsed")
+            with c3:
+                st.markdown('<div style="margin-bottom: 5px; font-size: 0.8rem; font-weight: 600; color: #94a3b8;"><i class="fas fa-calendar-day"></i> DATE</div>', unsafe_allow_html=True)
+                r_date = st.date_input("Identified Date", value=datetime.today(), label_visibility="collapsed")
+            
+            # Row 3: Mitigation
+            st.markdown('<div style="margin-top: 10px; margin-bottom: 5px; font-size: 0.8rem; font-weight: 600; color: #94a3b8;"><i class="fas fa-shield-alt"></i> MITIGATION PLAN</div>', unsafe_allow_html=True)
+            r_mitigation = st.text_area("Plan", placeholder="What actions are being taken to minimize this risk?", label_visibility="collapsed", height=100)
+            
+            # Submit Button
+            st.markdown('<div style="height: 10px;"></div>', unsafe_allow_html=True)
+            col_btn_s1, col_btn, col_btn_s2 = st.columns([1, 1, 1])
+            with col_btn:
                 st.markdown('<div class="add-btn">', unsafe_allow_html=True)
-                submitted = st.form_submit_button("Log Risk", use_container_width=True)
+                submitted = st.form_submit_button("REGISTER RISK", use_container_width=True)
                 st.markdown('</div>', unsafe_allow_html=True)
-                
-                if submitted and r_desc:
+            
+            if submitted:
+                if not r_desc:
+                    st.error("Please provide a risk description.")
+                else:
                     new_risk_data = {
                         'project_id': project_id,
+                        'activity_id': activity_map[r_activity],
                         'description': r_desc,
                         'impact': r_impact,
                         'date_identified': r_date,
@@ -71,8 +102,42 @@ def risk_register_page():
                         'status': 'Open'
                     }
                     database.add_risk(new_risk_data, current_user['id'])
-                    st.success("Risk logged successfully!")
+                    st.success("✅ Risk registered and assigned successfully!")
                     st.rerun()
+
+    # --- Resolve Risk Dialog ---
+    @st.dialog("Resolve Risk", width="medium")
+    def resolve_risk_dialog(risk_id, risk_desc):
+        st.markdown(f"### Resolving Risk: **{risk_desc}**")
+        st.info("To resolve this risk, you must upload document(s) proving the mitigation action was successful.")
+        
+        uploaded_files = st.file_uploader(
+            "Upload Closure Proof(s) *",
+            type=['pdf', 'docx', 'xlsx', 'png', 'jpg', 'jpeg', 'zip'],
+            accept_multiple_files=True,
+            key=f"close_{risk_id}"
+        )
+        
+        if uploaded_files:
+            st.success(f"📂 {len(uploaded_files)} file(s) selected.")
+            if st.button("✅ Confirm Resolution", type="primary", use_container_width=True):
+                # Save files
+                import os
+                upload_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'uploads', 'risks', str(risk_id))
+                os.makedirs(upload_dir, exist_ok=True)
+                
+                saved_paths = []
+                for uploaded_file in uploaded_files:
+                    file_path = os.path.join(upload_dir, uploaded_file.name)
+                    with open(file_path, "wb") as f:
+                        f.write(uploaded_file.getbuffer())
+                    saved_paths.append(os.path.join('uploads', 'risks', str(risk_id), uploaded_file.name))
+                
+                # Update DB with comma-separated paths
+                paths_str = ",".join(saved_paths)
+                database.update_risk_status(risk_id, "Resolved", current_user['id'], closure_file_path=paths_str)
+                st.success(f"Risk resolved and {len(uploaded_files)} proof(s) uploaded!")
+                st.rerun()
 
     st.markdown("### Open Risks")
     
@@ -86,16 +151,16 @@ def risk_register_page():
                 rc1, rc2, rc3 = st.columns([4, 1, 1])
                 with rc1:
                     st.markdown(f"**{risk['description']}**")
-                    st.caption(f"📅 {risk['date_identified']} | Plan: {risk['mitigation_action']}")
+                    link_info = f"🔗 Linked to: {risk['activity_name']}" if risk['activity_name'] else "🌍 Project Level"
+                    st.caption(f"📅 {risk['date_identified']} | {link_info}")
+                    st.caption(f"Plan: {risk['mitigation_action']}")
                 with rc2:
                     color = "red" if risk['impact'] == 'H' else ("orange" if risk['impact'] == 'M' else "blue")
                     st.markdown(f":{color}[**{risk['impact']}-Impact**]")
                 with rc3:
                     st.markdown('<div class="check-btn">', unsafe_allow_html=True)
                     if st.button("Resolve", key=f"close_risk_{risk['risk_id']}", type="primary", use_container_width=True):
-                        database.update_risk_status(risk['risk_id'], "Resolved", current_user['id'])
-                        st.success("Risk resolved.")
-                        st.rerun()
+                        resolve_risk_dialog(risk['risk_id'], risk['description'])
                     st.markdown('</div>', unsafe_allow_html=True)
     else:
         st.info("✅ No active open risks.")

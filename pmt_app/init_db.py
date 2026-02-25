@@ -147,14 +147,17 @@ def init_db():
     CREATE TABLE IF NOT EXISTS risks (
         risk_id SERIAL PRIMARY KEY,
         project_id INTEGER NOT NULL,
+        activity_id INTEGER, -- NEW: Link to activity
         date_identified DATE,
         description TEXT NOT NULL,
         impact TEXT,
         status TEXT DEFAULT 'Open',
         mitigation_action TEXT,
+        closure_file_path TEXT, -- NEW: Proof of closure
         recorded_by INTEGER,
         recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (project_id) REFERENCES projects (project_id),
+        FOREIGN KEY (activity_id) REFERENCES baseline_schedule (activity_id),
         FOREIGN KEY (recorded_by) REFERENCES users (user_id)
     )
     ''')
@@ -166,6 +169,7 @@ def init_db():
         activity_id INTEGER NOT NULL,
         file_name TEXT NOT NULL,
         file_path TEXT NOT NULL,
+        doc_type TEXT DEFAULT 'Draft', -- NEW: First Draft, Regular Draft, Final Document
         uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         uploaded_by INTEGER NOT NULL,
         FOREIGN KEY (activity_id) REFERENCES baseline_schedule (activity_id),

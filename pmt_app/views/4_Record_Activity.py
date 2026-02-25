@@ -102,48 +102,46 @@ def record_activity_page():
     
     st.divider()
     
-    # --- Completion Dialog ---
-    @st.dialog("Complete Task", width="medium")
-    def complete_task_dialog(activity_id, activity_name, expected_output):
-        st.markdown(f"### Completing: **{activity_name}**")
-        
-        if expected_output:
-            st.info(f"**Expected Output:** {expected_output}")
-        
+    # --- Submission Dialog ---
+    @st.dialog("Submit Documents", width="medium")
+    def submit_document_dialog(activity_id, activity_name, doc_type):
+        st.markdown(f"### Submitting {doc_type}: **{activity_name}**")
+        st.info(f"Uploading **{doc_type}(s)** is required to progress this task.")
         st.markdown("---")
-        st.markdown("**Please upload the deliverable file associated with this task:**")
         
-        uploaded_file = st.file_uploader(
-            "Upload Output File *",
+        uploaded_files = st.file_uploader(
+            f"Select {doc_type}(s) *",
             type=['pdf', 'docx', 'xlsx', 'png', 'jpg', 'jpeg', 'csv', 'zip'],
-            key=f"upload_{activity_id}"
+            accept_multiple_files=True,
+            key=f"upload_{activity_id}_{doc_type}"
         )
         
-        if uploaded_file is not None:
-            st.success(f"📄 File selected: **{uploaded_file.name}** ({uploaded_file.size / 1024:.1f} KB)")
-            
-            if st.button("✅ Confirm Completion", type="primary", use_container_width=True):
-                # Save file to disk
-                upload_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'uploads', str(project_id), str(activity_id))
-                os.makedirs(upload_dir, exist_ok=True)
+        if uploaded_files:
+            st.success(f"📂 {len(uploaded_files)} file(s) selected.")
+            if st.button(f"✅ Upload {len(uploaded_files)} Document(s)", type="primary", use_container_width=True):
+                for uploaded_file in uploaded_files:
+                    # Save file
+                    upload_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'uploads', str(project_id), str(activity_id))
+                    os.makedirs(upload_dir, exist_ok=True)
+                    file_path = os.path.join(upload_dir, uploaded_file.name)
+                    with open(file_path, "wb") as f:
+                        f.write(uploaded_file.getbuffer())
+                    
+                    # Save to DB
+                    relative_path = os.path.join('uploads', str(project_id), str(activity_id), uploaded_file.name)
+                    database.save_task_output(activity_id, uploaded_file.name, relative_path, current_user['id'], doc_type=doc_type)
                 
-                file_path = os.path.join(upload_dir, uploaded_file.name)
-                with open(file_path, "wb") as f:
-                    f.write(uploaded_file.getbuffer())
-                
-                # Save metadata to DB
-                relative_path = os.path.join('uploads', str(project_id), str(activity_id), uploaded_file.name)
-                database.save_task_output(activity_id, uploaded_file.name, relative_path, current_user['id'])
-                
-                # Update activity status
-                success, msg = database.update_activity_status(activity_id, 'Complete', current_user['id'])
-                if success:
-                    st.success("Task completed and output uploaded!")
-                    st.rerun()
+                # Automatic status progression
+                if doc_type == "First Draft":
+                    database.update_activity_status(activity_id, 'Active', current_user['id'])
+                    st.success("First Draft(s) uploaded! Task is now officially STARTED.")
+                elif doc_type == "Final Document":
+                    database.update_activity_status(activity_id, 'Complete', current_user['id'])
+                    st.success("Final Document(s) uploaded! Task is now COMPLETE.")
                 else:
-                    st.error(msg)
-        else:
-            st.warning("You must upload the output file before marking this task as complete.")
+                    st.success(f"{len(uploaded_files)} {doc_type}(s) uploaded successfully.")
+                
+                st.rerun()
     
     # --- Summary Stats (Scoped to visible activities) ---
     total = len(activities)
@@ -218,16 +216,28 @@ def record_activity_page():
             
             with act_col2:
                 if status == "Not Started":
-                    st.markdown('<div class="add-btn">', unsafe_allow_html=True)
+                    st.markdown('<div class="upload-btn">', unsafe_allow_html=True)
                     if st.button("Start Phase", key=f"btn_{row['activity_id']}", use_container_width=True):
-                        success, msg = database.update_activity_status(row['activity_id'], 'Active', current_user['id'])
-                        if success:
-                            st.rerun()
+                        submit_document_dialog(row['activity_id'], row['activity_name'], "First Draft")
                     st.markdown('</div>', unsafe_allow_html=True)
+                    st.caption("⚠️ Requires First Draft")
                 elif status == "Active":
+                    # Check for open risks
+                    has_risks = database.has_open_risks(row['activity_id'])
+                    
                     st.markdown('<div class="check-btn">', unsafe_allow_html=True)
-                    if st.button("Complete", key=f"btn_{row['activity_id']}", use_container_width=True, type="primary"):
-                        complete_task_dialog(row['activity_id'], row['activity_name'], row.get('expected_output'))
+                    if has_risks:
+                        st.warning("⚠️ Open Risks")
+                        if st.button("Complete", key=f"btn_{row['activity_id']}", use_container_width=True, type="secondary", disabled=True):
+                            pass
+                    else:
+                        if st.button("Complete", key=f"btn_{row['activity_id']}", use_container_width=True, type="primary"):
+                            submit_document_dialog(row['activity_id'], row['activity_name'], "Final Document")
+                    st.markdown('</div>', unsafe_allow_html=True)
+                    
+                    st.markdown('<div class="add-btn">', unsafe_allow_html=True)
+                    if st.button("Upload Draft", key=f"draft_{row['activity_id']}", use_container_width=True):
+                        submit_document_dialog(row['activity_id'], row['activity_name'], "Regular Draft")
                     st.markdown('</div>', unsafe_allow_html=True)
                 else:
                     is_privileged = current_user['role'] in ['admin', 'pm', 'executive']

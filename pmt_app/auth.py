@@ -57,7 +57,15 @@ def require_role(roles):
         
     user_role = st.session_state.get('role')
     if user_role not in roles and user_role != 'admin':
-        st.error("You do not have permission to view this page")
+        st.markdown(f"""
+            <div style="background: rgba(239, 68, 68, 0.1); padding: 2rem; border-radius: 12px; border: 1px solid rgba(239, 68, 68, 0.3); text-align: center;">
+                <div style="font-size: 3rem; margin-bottom: 1rem;">🔒</div>
+                <h2 style="color: #ef4444 !important; margin-bottom: 0.5rem;">Access Denied</h2>
+                <div style="opacity: 0.8; margin-bottom: 2rem;">You do not have the required permissions to view this page.</div>
+            </div>
+        """, unsafe_allow_html=True)
+        if st.button("Return to Dashboard Home", use_container_width=True, type="primary"):
+            st.switch_page("main.py")
         st.stop()
 
 def get_current_user():

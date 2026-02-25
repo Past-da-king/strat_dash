@@ -137,6 +137,72 @@ def get_category_spending(project_id):
 
 
 @st.cache_data(ttl=600)
+def get_portfolio_metrics(pm_id=None, user_id=None):
+    """
+    Fetches all projects and their associated metrics in a single, optimized query.
+    This is the fastest way to load the Executive Dashboard.
+    """
+    try:
+        # One giant query to get everything for everyone
+        # Removed PG-specific casting for SQLite compatibility
+        query = '''
+            WITH project_list AS (
+                SELECT p.* 
+                FROM projects p
+                WHERE (%s IS NULL OR p.pm_user_id = %s)
+                   OR (%s IS NULL OR EXISTS (SELECT 1 FROM project_assignments pa WHERE pa.project_id = p.project_id AND pa.user_id = %s))
+                   OR (%s IS NULL OR EXISTS (SELECT 1 FROM baseline_schedule bs WHERE bs.project_id = p.project_id AND bs.responsible_user_id = %s))
+            )
+            SELECT 
+                pl.*,
+                COALESCE((SELECT SUM(amount) FROM expenditure_log WHERE project_id = pl.project_id), 0) as total_spent,
+                COALESCE((SELECT SUM(budgeted_cost) FROM baseline_schedule WHERE project_id = pl.project_id), 0) as total_planned,
+                COALESCE((SELECT SUM(budgeted_cost) FROM baseline_schedule WHERE project_id = pl.project_id AND status = 'Complete'), 0) as completed_budget,
+                (SELECT COUNT(*) FROM baseline_schedule WHERE project_id = pl.project_id) as total_activities,
+                (SELECT COUNT(*) FROM baseline_schedule WHERE project_id = pl.project_id AND status = 'Complete') as completed_activities,
+                (SELECT COUNT(*) FROM baseline_schedule WHERE project_id = pl.project_id AND status = 'Active') as active_activities,
+                (SELECT COUNT(*) FROM baseline_schedule WHERE project_id = pl.project_id AND status != 'Complete' AND planned_finish < CURRENT_DATE) as overdue_activities
+            FROM project_list pl
+        '''
+        df = database.get_df(query, (pm_id, pm_id, user_id, user_id, user_id, user_id))
+        
+        if df.empty:
+            return []
+
+        results = []
+        for _, project in df.iterrows():
+            total_budget = float(project["total_budget"]) if pd.notna(project["total_budget"]) else 0.0
+            total_spent = float(project["total_spent"]) if pd.notna(project["total_spent"]) else 0.0
+            total_planned = float(project["total_planned"]) if pd.notna(project["total_planned"]) else 0.0
+            completed_budget = float(project["completed_budget"]) if pd.notna(project["completed_budget"]) else 0.0
+            
+            pct_complete = (completed_budget / total_planned * 100) if total_planned > 0 else 0.0
+            forecast = total_spent + (total_budget - completed_budget)
+            
+            budget_health = "Green"
+            if forecast > total_budget * 1.05 and total_budget > 0:
+                budget_health = "Red"
+            elif forecast > total_budget and total_budget > 0:
+                budget_health = "Yellow"
+
+            results.append({
+                "project_id": project["project_id"],
+                "project_name": str(project["project_name"]),
+                "project_number": str(project["project_number"]),
+                "client": project.get("client", "N/A"),
+                "total_budget": total_budget,
+                "total_spent": total_spent,
+                "pct_complete": min(pct_complete, 100.0),
+                "budget_used_pct": (total_spent / total_budget * 100) if total_budget > 0 else 0.0,
+                "budget_health": budget_health,
+                "schedule_health": "Green" if project['overdue_activities'] == 0 else "Red"
+            })
+        return results
+    except Exception as e:
+        logger.error(f"Error in get_portfolio_metrics: {e}")
+        return []
+
+@st.cache_data(ttl=600)
 def get_all_projects_summary():
     """
     Returns a summary dataframe for all projects.

@@ -22,7 +22,7 @@ def admin_panel():
     </div>
     """, unsafe_allow_html=True)
     
-    t1, t2 = st.tabs(["USER MANAGEMENT", "AUDIT LOGS"])
+    t1, t2, t3 = st.tabs(["USER MANAGEMENT", "AUDIT LOGS", "DATA MANAGEMENT"])
     
     with t1:
         st.subheader("Current Users")
@@ -69,6 +69,78 @@ def admin_panel():
             ORDER BY changed_at DESC
         ''')
         st.dataframe(logs, use_container_width=True, hide_index=True)
+
+    with t3:
+        import data_mgmt
+        st.subheader("Database Backup & Recovery")
+        st.info("Export your data to a multi-sheet Excel file or restore it from a previous backup.")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.markdown("#### 📤 Export Data")
+            st.write("Download the entire database (all tables).")
+            
+            # --- Option A: SQLite DB File ---
+            st.markdown("**Option A: Full SQLite Database (.db)**")
+            db_file = data_mgmt.get_sqlite_db_file()
+            if db_file:
+                st.markdown('<div class="download-btn">', unsafe_allow_html=True)
+                st.download_button(
+                    "DOWNLOAD .DB FILE",
+                    data=db_file,
+                    file_name="pm_tool_backup.db",
+                    mime="application/x-sqlite3",
+                    use_container_width=True
+                )
+                st.markdown('</div>', unsafe_allow_html=True)
+            else:
+                st.info("SQLite backup only available in local mode.")
+
+            st.markdown('<div style="height:15px"></div>', unsafe_allow_html=True)
+
+            # --- Option C: Full System Archive ---
+            st.markdown("**Option C: Full System Archive (.ZIP)**")
+            st.write("Best for full backups. Includes DB + Excel + All Documents.")
+            st.markdown('<div class="download-btn">', unsafe_allow_html=True)
+            if st.button("GENERATE FULL ARCHIVE", use_container_width=True):
+                with st.spinner("Packaging all documents and data..."):
+                    zip_data = data_mgmt.generate_full_archive()
+                    st.download_button(
+                        "DOWNLOAD FULL ARCHIVE (.ZIP)",
+                        data=zip_data,
+                        file_name=f"StratEdge_Full_Backup_{pd.Timestamp.now().strftime('%Y%m%d_%H%M')}.zip",
+                        mime="application/zip",
+                        use_container_width=True
+                    )
+            st.markdown('</div>', unsafe_allow_html=True)
+            
+        with col2:
+            st.markdown("#### 📥 Import Data")
+            st.warning("⚠️ **DANGER**: Importing data will DELETE all current information and replace it with the contents of the Excel file.")
+            uploaded_file = st.file_uploader("Upload Backup Excel", type=["xlsx"])
+            if uploaded_file:
+                st.markdown('<div class="delete-btn">', unsafe_allow_html=True)
+                if st.button("RESTORE DATABASE", use_container_width=True):
+                    success, msg = data_mgmt.import_all_data(uploaded_file)
+                    if success:
+                        st.success(msg)
+                        st.balloons()
+                    else:
+                        st.error(msg)
+                st.markdown('</div>', unsafe_allow_html=True)
+
+        st.divider()
+        st.markdown("#### 🛡️ Advanced Actions")
+        if st.checkbox("Enable Destructive Actions"):
+            st.markdown('<div class="delete-btn">', unsafe_allow_html=True)
+            if st.button("DELETE ALL DATA (FACTORY RESET)", use_container_width=True):
+                tables = ["task_outputs", "risks", "audit_log", "project_assignments", "expenditure_log", "activity_log", "baseline_schedule", "projects", "users"]
+                for t in tables:
+                    database.execute_query(f"DELETE FROM {t}", commit=True)
+                st.success("All data cleared. Please register a new admin user.")
+                st.rerun()
+            st.markdown('</div>', unsafe_allow_html=True)
 
 if __name__ == "__main__":
     admin_panel()
