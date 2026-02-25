@@ -1,14 +1,19 @@
 import streamlit as st
 
+
 def global_css():
     """Inject theme-aware premium global CSS into the Streamlit application."""
     # Inject external assets via HTML link tags for better reliability
-    st.markdown("""
+    st.markdown(
+        """
         <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap">
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
-    """, unsafe_allow_html=True)
+    """,
+        unsafe_allow_html=True,
+    )
 
-    st.markdown(f"""
+    st.markdown(
+        f"""
     <style>
 
         /* --- Sidebar Hiding Logic --- */
@@ -132,88 +137,39 @@ def global_css():
             font-size: 1.1rem; font-weight: 700;
         }}
 
-        /* --- Sidebar & Tabs --- */
+/* --- Sidebar --- */
         [data-testid="stSidebar"] {{
             background: linear-gradient(180deg, #1a1a2e 0%, #16213e 100%) !important;
         }}
-        
-        /* THE ULTIMATE FIX: Force Sidebar ordering */
-        [data-testid="stSidebarContent"] {{
-            display: flex !important;
-            flex-direction: column !important;
-            position: relative !important;
-        }}
-
-        /* Pin the collapse arrow (header) to the top right */
-        [data-testid="stSidebarHeader"] {{
-            position: absolute !important;
-            top: 10px !important;
-            right: 5px !important;
-            z-index: 1000 !important;
-            background: transparent !important;
-            padding: 0 !important;
-            min-height: 0 !important;
-            width: 40px !important;
-        }}
-
-        /* Pull our custom markdown to the very top */
-        [data-testid="stSidebarUserContent"] {{
-            order: -1 !important;
-            padding-top: 0 !important;
-            padding-bottom: 0 !important;
-        }}
-
-        /* Clean Flexbox Branding Container */
-        .custom-sidebar-header {{
-            display: flex !important;
-            align-items: center !important;
-            gap: 10px !important;
-            padding: 15px 50px 10px 15px !important; /* Reduced bottom padding */
-            margin-bottom: 30px !important; /* Added 30px margin below the border */
-            border-bottom: 1px solid rgba(128,128,128,0.1) !important;
-        }}
 
         .brand-logo-img {{
-            width: 44px !important;
-            height: auto !important;
-            flex-shrink: 0 !important;
+            width: 44px;
+            height: auto;
+            flex-shrink: 0;
         }}
 
         .brand-text-block {{
-            display: flex !important;
-            flex-direction: column !important;
-            line-height: 1 !important;
+            display: flex;
+            flex-direction: column;
+            line-height: 1;
         }}
 
         .brand-title-main {{
-            color: white !important;
-            font-size: 1.15rem !important;
-            font-weight: 800 !important;
-            letter-spacing: -0.5px !important;
-            font-family: 'Inter', sans-serif !important;
-            margin: 0 !important;
-            padding: 0 !important;
+            color: white;
+            font-size: 1.15rem;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+            font-family: 'Inter', sans-serif;
         }}
 
         .brand-subtitle-main {{
-            color: #38bdf8 !important;
-            font-size: 0.58rem !important;
-            font-weight: 700 !important;
-            letter-spacing: 1.5px !important;
-            text-transform: uppercase !important;
-            font-family: 'Inter', sans-serif !important;
-            margin-top: 2px !important;
-        }}
-
-        /* Keep the header for the collapse button (the arrow) but remove its bulk */
-        [data-testid="stSidebarHeader"] {{
-            padding: 0 !important;
-            min-height: 0 !important;
-            background: transparent !important;
-        }}
-        
-        [data-testid="stSidebarHeader"] button {{
-            margin-top: 5px !important;
+            color: #38bdf8;
+            font-size: 0.58rem;
+            font-weight: 700;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            font-family: 'Inter', sans-serif;
+            margin-top: 2px;
         }}
 
         .stTabs [aria-selected="true"] {{
@@ -425,4 +381,6 @@ def global_css():
         }}
 
     </style>
-    """, unsafe_allow_html=True)
+    """,
+        unsafe_allow_html=True,
+    )

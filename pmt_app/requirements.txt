@@ -8,3 +8,4 @@ seaborn
 reportlab
 pdfrw
 psycopg2-binary
+extra-streamlit-components
