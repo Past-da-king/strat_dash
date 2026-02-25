@@ -73,10 +73,72 @@ def global_css():
         }}
 
         /* --- Button Styling --- */
-        button[data-testid="baseButton-secondary"], 
-        button[data-testid="baseButton-primary"],
-        .stButton > button, 
-        .stDownloadButton > button {{
+        /* Universal Nuclear Reset for Popovers (Portal Level) */
+        [data-testid="stPopoverContent"],
+        [data-testid="stPopoverContent"] button,
+        [data-testid="stPopoverContent"] div,
+        [data-testid="stPopoverContent"] a,
+        [data-testid="stPopoverContent"] summary,
+        [data-testid="stPopoverContent"] [data-testid^="baseButton"] {{
+            background: transparent !important;
+            background-color: transparent !important;
+            background-image: none !important;
+            border: none !important;
+            box-shadow: none !important;
+            outline: none !important;
+            border-radius: 0 !important;
+            transition: none !important;
+            min-height: unset !important;
+            height: auto !important;
+            width: auto !important;
+            box-sizing: border-box !important;
+        }}
+
+        /* Plain Text Link Styling */
+        [data-testid="stPopoverContent"] a, 
+        [data-testid="stPopoverContent"] button, 
+        [data-testid="stPopoverContent"] summary {{
+            display: block !important;
+            padding: 6px 0 !important;
+            color: #38bdf8 !important;
+            font-size: 0.95rem !important;
+            font-weight: 400 !important;
+            text-decoration: none !important;
+            text-align: left !important;
+            justify-content: flex-start !important;
+        }}
+
+        /* Hover Feedback: Just Underline */
+        [data-testid="stPopoverContent"] a:hover, 
+        [data-testid="stPopoverContent"] button:hover, 
+        [data-testid="stPopoverContent"] summary:hover {{
+            text-decoration: underline !important;
+            color: #7dd3fc !important;
+            background: transparent !important;
+        }}
+
+        /* Red Delete Link */
+        [data-testid="stPopoverContent"] .del-link,
+        [data-testid="stPopoverContent"] button:has(div:contains("Delete")),
+        [data-testid="stPopoverContent"] button:has(p:contains("Delete")) {{
+            color: #f87171 !important;
+        }}
+
+        /* Wipe out expander box look */
+        [data-testid="stPopoverContent"] [data-testid="stExpander"] {{
+            border: none !important;
+            background: transparent !important;
+            margin: 0 !important;
+        }}
+        [data-testid="stPopoverContent"] [data-testid="stExpander"] summary svg {{
+            display: none !important;
+        }}
+
+        /* Global Buttons (Outside Popovers only) */
+        button[data-testid="baseButton-secondary"]:not([data-testid="stPopoverContent"] *), 
+        button[data-testid="baseButton-primary"]:not([data-testid="stPopoverContent"] *),
+        .stButton > button:not([data-testid="stPopoverContent"] *), 
+        .stDownloadButton > button:not([data-testid="stPopoverContent"] *) {{
             color: white !important;
             background: var(--primary-gradient) !important;
             border: none !important;
@@ -85,21 +147,9 @@ def global_css():
             transition: all 0.3s ease !important;
         }}
 
-        /* Secondary/Ghost Buttons */
-        .stButton > button[kind="secondary"] {{
-            background: transparent !important;
-            color: var(--primary-color) !important;
-            border: 2px solid var(--primary-color) !important;
-        }}
-
-        /* --- Download Button --- */
-        .stDownloadButton > button {{
+        /* Download Button Specific (Outside Popovers) */
+        .stDownloadButton > button:not([data-testid="stPopoverContent"] *) {{
             background: linear-gradient(135deg, #059669 0%, #34d399 100%) !important;
-            color: white !important;
-            border: none !important;
-            border-radius: var(--radius-sm) !important;
-            font-weight: 600 !important;
-            transition: all 0.3s ease !important;
         }}
 
         /* --- Metric & KPI Card Styling (Theme-Aware) --- */

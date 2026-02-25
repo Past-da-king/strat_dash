@@ -61,6 +61,53 @@ def init_session_table():
 init_session_table()
 
 
+def init_repository_table():
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS repository_files (
+            file_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            project_id INTEGER NOT NULL,
+            parent_id INTEGER,
+            name TEXT NOT NULL,
+            is_folder INTEGER NOT NULL DEFAULT 0,
+            file_path TEXT,
+            uploaded_by INTEGER,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (project_id) REFERENCES projects (project_id),
+            FOREIGN KEY (parent_id) REFERENCES repository_files (file_id),
+            FOREIGN KEY (uploaded_by) REFERENCES users (user_id)
+        )
+    """)
+    conn.commit()
+    conn.close()
+
+
+init_repository_table()
+
+
+def init_repository_links_table():
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS repository_links (
+            link_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            source_type TEXT NOT NULL, -- 'R' repo, 'A' activity, 'K' risk
+            source_id INTEGER NOT NULL,
+            target_type TEXT NOT NULL,
+            target_id INTEGER NOT NULL,
+            created_by INTEGER,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (created_by) REFERENCES users (user_id)
+        )
+    """)
+    conn.commit()
+    conn.close()
+
+
+init_repository_links_table()
+
+
 def execute_query(query, params=(), commit=False):
     """Executes a query with automatic PostgreSQL-to-SQLite translation."""
     # 1. Translate placeholders: %s -> ?
@@ -500,6 +547,110 @@ def has_open_risks(activity_id):
         (activity_id,),
     )
     return res[0]["cnt"] > 0 if res else False
+
+
+# ============================================================
+# Project Repository
+# ============================================================
+def create_repo_folder(project_id, name, parent_id, user_id):
+    """Create a folder in the project repository."""
+    query = """
+    INSERT INTO repository_files (project_id, parent_id, name, is_folder, uploaded_by)
+    VALUES (%s, %s, %s, 1, %s)
+    """
+    return execute_query(query, (project_id, parent_id, name, user_id), commit=True)
+
+
+def add_repo_file(project_id, parent_id, name, file_path, user_id):
+    """Add a file entry to the project repository."""
+    query = """
+    INSERT INTO repository_files (project_id, parent_id, name, is_folder, file_path, uploaded_by)
+    VALUES (%s, %s, %s, 0, %s, %s)
+    """
+    return execute_query(query, (project_id, parent_id, name, file_path, user_id), commit=True)
+
+
+def get_repo_contents(project_id, parent_id=None):
+    """Get all items (folders and files) inside a given parent folder. Use parent_id=None for root."""
+    if parent_id is None:
+        query = """
+            SELECT rf.*, u.full_name as uploader_name
+            FROM repository_files rf
+            LEFT JOIN users u ON rf.uploaded_by = u.user_id
+            WHERE rf.project_id = %s AND rf.parent_id IS NULL
+            ORDER BY rf.is_folder DESC, rf.name ASC
+        """
+        return get_df(query, (project_id,))
+    else:
+        query = """
+            SELECT rf.*, u.full_name as uploader_name
+            FROM repository_files rf
+            LEFT JOIN users u ON rf.uploaded_by = u.user_id
+            WHERE rf.project_id = %s AND rf.parent_id = %s
+            ORDER BY rf.is_folder DESC, rf.name ASC
+        """
+        return get_df(query, (project_id, parent_id))
+
+
+def delete_repo_item(file_id):
+    """Delete a repository item (file or folder). For folders, children must be deleted first."""
+    # Delete children first (recursive cleanup)
+    children = execute_query("SELECT file_id FROM repository_files WHERE parent_id = %s", (file_id,))
+    for child in children:
+        delete_repo_item(child['file_id'])
+    execute_query("DELETE FROM repository_files WHERE file_id = %s", (file_id,), commit=True)
+
+
+def delete_task_output(output_id):
+    """Delete a task output entry."""
+    return execute_query("DELETE FROM task_outputs WHERE output_id = %s", (output_id,), commit=True)
+
+
+def remove_risk_closure_file(risk_id, file_path):
+    """Remove a specific closure file from a risk (handling comma-separated paths)."""
+    res = execute_query("SELECT closure_file_path FROM risks WHERE risk_id = %s", (risk_id,))
+    if not res:
+        return False
+
+    current_paths = res[0]["closure_file_path"]
+    if not current_paths:
+        return True
+
+    path_list = [p.strip() for p in current_paths.split(",") if p.strip()]
+    if file_path in path_list:
+        path_list.remove(file_path)
+
+    new_paths = ",".join(path_list) if path_list else None
+    return execute_query(
+        "UPDATE risks SET closure_file_path = %s WHERE risk_id = %s",
+        (new_paths, risk_id),
+        commit=True,
+    )
+
+
+def create_file_link(source_type, source_id, target_type, target_id, user_id):
+    """Create a manual bi-directional link between two files or folders."""
+    # To keep it bi-directional we just store it once and query both ways
+    query = """
+    INSERT INTO repository_links (source_type, source_id, target_type, target_id, created_by)
+    VALUES (%s, %s, %s, %s, %s)
+    """
+    return execute_query(query, (source_type, source_id, target_type, target_id, user_id), commit=True)
+
+
+def get_file_links(item_type, item_id):
+    """Retrieve all items linked to this specific item (manually)."""
+    # Fetch where it is source or where it is target
+    query = """
+    SELECT * FROM repository_links 
+    WHERE (source_type = %s AND source_id = %s)
+    OR (target_type = %s AND target_id = %s)
+    """
+    return execute_query(query, (item_type, item_id, item_type, item_id))
+
+
+def delete_file_link(link_id):
+    execute_query("DELETE FROM repository_links WHERE link_id = %s", (link_id,), commit=True)
 
 
 def create_session_token(user_id, token, expires_at):

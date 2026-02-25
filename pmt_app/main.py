@@ -259,6 +259,11 @@ def main():
         risk_reg = st.Page(
             "views/5_Risk_Register.py", title="Risk Register", icon=":material/warning:"
         )
+        repo_page = st.Page(
+            "views/7_Project_Repository.py",
+            title="Project Repository",
+            icon=":material/folder_special:",
+        )
         admin_panel = st.Page(
             "views/6_Admin_Panel.py",
             title="Admin Panel",
@@ -284,6 +289,7 @@ def main():
         pages.append(record_act)
         pages.append(record_exp)
         pages.append(risk_reg)
+        pages.append(repo_page)
 
         if role in ["admin", "executive"]:
             pages.append(admin_panel)
