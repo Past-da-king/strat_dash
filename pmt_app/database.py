@@ -1,12 +1,38 @@
-import sqlite3
-import pandas as pd
 import streamlit as st
+import pandas as pd
 import os
 import re
+from azure.storage.blob import BlobServiceClient
 
 # --- DATABASE CONFIG ---
 SQLITE_DB_PATH = os.path.join(os.path.dirname(__file__), "pm_tool.db")
-UPLOADS_DIR = os.path.join(os.path.dirname(__file__), "uploads")
+UPLOADS_DIR = None  # All file storage is now handled by Azure Blob Storage
+
+# --- AZURE STORAGE CONFIG ---
+AZURE_CONNECTION = st.secrets["azure"]["connection_string"]
+AZURE_CONTAINER = st.secrets["azure"]["container_name"]
+
+def get_blob_client(blob_name):
+    blob_service_client = BlobServiceClient.from_connection_string(AZURE_CONNECTION)
+    return blob_service_client.get_blob_client(container=AZURE_CONTAINER, blob=blob_name)
+
+def upload_file_to_azure(file_bytes, blob_name):
+    """Uploads bytes to Azure Blob Storage."""
+    blob_client = get_blob_client(blob_name)
+    blob_client.upload_blob(file_bytes, overwrite=True)
+    return blob_name
+
+def download_file_from_azure(blob_name):
+    """Downloads blob content as bytes."""
+    blob_client = get_blob_client(blob_name)
+    return blob_client.download_blob().readall()
+
+def blob_exists(blob_name):
+    """Checks if a blob exists in Azure."""
+    blob_client = get_blob_client(blob_name)
+    return blob_client.exists()
+
+import sqlite3
 
 
 def get_connection():

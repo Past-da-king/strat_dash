@@ -9,3 +9,4 @@ reportlab
 pdfrw
 psycopg2-binary
 extra-streamlit-components
+azure-storage-blob

@@ -35,13 +35,13 @@ def record_activity_page():
             transform: translateY(-2px);
         }
         .task-card-complete {
-            border-left: 5px solid #4caf50;
+            border-left: 5px solid #10b981;
         }
         .task-card-active {
-            border-left: 5px solid #0ea5e9;
+            border-left: 5px solid #f59e0b;
         }
         .task-card-pending {
-            border-left: 5px solid #ffc107;
+            border-left: 5px solid #ef4444;
         }
         .badge {
             display: inline-block;
@@ -59,9 +59,9 @@ def record_activity_page():
             background: rgba(245, 158, 11, 0.1) !important; color: #fbbf24 !important;
             border: 1px solid rgba(245, 158, 11, 0.2) !important;
         }
-        .badge-status-complete { background: rgba(16, 185, 129, 0.15) !important; color: #34d399 !important; border: 1px solid rgba(16, 185, 129, 0.3) !important; }
-        .badge-status-active { background: rgba(37, 99, 235, 0.15) !important; color: #60a5fa !important; border: 1px solid rgba(37, 99, 235, 0.3) !important; }
-        .badge-status-pending { background: rgba(245, 158, 11, 0.15) !important; color: #fbbf24 !important; border: 1px solid rgba(245, 158, 11, 0.3) !important; }
+        .badge-status-complete { background: rgba(16, 185, 129, 0.15) !important; color: #10b981 !important; border: 1px solid rgba(16, 185, 129, 0.3) !important; }
+        .badge-status-active { background: rgba(245, 158, 11, 0.15) !important; color: #f59e0b !important; border: 1px solid rgba(245, 158, 11, 0.3) !important; }
+        .badge-status-pending { background: rgba(239, 68, 68, 0.15) !important; color: #ef4444 !important; border: 1px solid rgba(239, 68, 68, 0.3) !important; }
     </style>
     """, unsafe_allow_html=True)
     
@@ -134,16 +134,14 @@ def record_activity_page():
             st.success(f"📂 {len(uploaded_files)} file(s) selected.")
             if st.button(f"✅ Upload {len(uploaded_files)} Document(s)", type="primary", use_container_width=True):
                 for uploaded_file in uploaded_files:
-                    # Save file
-                    upload_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'uploads', str(project_id), str(activity_id))
-                    os.makedirs(upload_dir, exist_ok=True)
-                    file_path = os.path.join(upload_dir, uploaded_file.name)
-                    with open(file_path, "wb") as f:
-                        f.write(uploaded_file.getbuffer())
+                    # Determine blob name (path inside the container)
+                    blob_name = f"uploads/{project_id}/{activity_id}/{uploaded_file.name}"
                     
-                    # Save to DB
-                    relative_path = os.path.join('uploads', str(project_id), str(activity_id), uploaded_file.name)
-                    database.save_task_output(activity_id, uploaded_file.name, relative_path, current_user['id'], doc_type=doc_type)
+                    # Upload to Azure
+                    database.upload_file_to_azure(uploaded_file.getvalue(), blob_name)
+                    
+                    # Save record to DB (using the blob_name as the file_path)
+                    database.save_task_output(activity_id, uploaded_file.name, blob_name, current_user['id'], doc_type=doc_type)
                 
                 # Automatic status progression
                 if doc_type == "First Draft":
@@ -265,10 +263,14 @@ def record_activity_page():
                     with st.expander(f"VIEW SUBMITTED DOCUMENTS ({len(outputs)})", expanded=False, icon=":material/folder_open:"):
                         # List links vertically for a cleaner "File Explorer" feel
                         for _, out in outputs.iterrows():
-                            file_full_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', out['file_path'])
-                            if os.path.exists(file_full_path):
-                                with open(file_full_path, "rb") as f:
-                                    data = f.read()
+                            blob_name = out['file_path']
+                            data = None
+                            try:
+                                data = database.download_file_from_azure(blob_name)
+                            except:
+                                pass
+
+                            if data:
                                 b64 = base64.b64encode(data).decode()
                                 
                                 # Determine icon based on doc_type or filename

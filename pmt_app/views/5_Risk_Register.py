@@ -121,22 +121,18 @@ def risk_register_page():
         if uploaded_files:
             st.success(f"📂 {len(uploaded_files)} file(s) selected.")
             if st.button("✅ Confirm Resolution", type="primary", use_container_width=True):
-                # Save files
-                import os
-                upload_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'uploads', 'risks', str(risk_id))
-                os.makedirs(upload_dir, exist_ok=True)
-                
                 saved_paths = []
                 for uploaded_file in uploaded_files:
-                    file_path = os.path.join(upload_dir, uploaded_file.name)
-                    with open(file_path, "wb") as f:
-                        f.write(uploaded_file.getbuffer())
-                    saved_paths.append(os.path.join('uploads', 'risks', str(risk_id), uploaded_file.name))
+                    # Determine blob name
+                    blob_name = f"uploads/risks/{risk_id}/{uploaded_file.name}"
+                    # Upload to Azure
+                    database.upload_file_to_azure(uploaded_file.getvalue(), blob_name)
+                    saved_paths.append(blob_name)
                 
                 # Update DB with comma-separated paths
                 paths_str = ",".join(saved_paths)
                 database.update_risk_status(risk_id, "Resolved", current_user['id'], closure_file_path=paths_str)
-                st.success(f"Risk resolved and {len(uploaded_files)} proof(s) uploaded!")
+                st.success(f"Risk resolved and {len(uploaded_files)} proof(s) uploaded to Cloud!")
                 st.rerun()
 
     st.markdown("### Open Risks")

@@ -27,9 +27,9 @@ def pm_dashboard():
     
     # --- BRAND COLORS ---
     COLORS = {
-        'status_not_started': '#f59e0b',
-        'status_active': '#10b981',
-        'status_complete': '#0ea5e9',
+        'status_not_started': '#ef4444', # Red
+        'status_active': '#f59e0b', # Amber
+        'status_complete': '#10b981', # Green
         'status_critical': '#ef4444',
         'fin_budget': '#1e293b',
         'fin_actual': '#0891b2',
@@ -168,7 +168,7 @@ def pm_dashboard():
     <div class="report-header" style="background: linear-gradient(135deg, #0c4a6e 0%, #0ea5e9 100%);">
         <div style="display: flex; align-items: center; gap: 15px;">
             <i class="fas fa-file-invoice" style="font-size: 2.2rem;"></i>
-            <div class="report-title">STRATEGIC STATUS REPORT</div>
+            <div class="report-title">PROJECT OVERVIEW</div>
         </div>
         <div class="report-date" style="margin-left: 50px;">{m['project_name']} ({m['project_number']}) | {pd.Timestamp.now().strftime('%B %d, %Y')}</div>
     </div>
@@ -195,24 +195,41 @@ def pm_dashboard():
 
     with col2:
         st.markdown("### Project Health")
+        
+        project_risks = database.get_project_risks(project_id)
+        open_risks = project_risks[project_risks['status'] == 'Open'] if not project_risks.empty else pd.DataFrame()
+        
+        if open_risks.empty:
+            risk_color = '#10b981' # Green (No active risks)
+            risk_icon = '✓'
+        elif 'H' in open_risks['impact'].values:
+            risk_color = '#ef4444' # Red (Critical/High)
+            risk_icon = '!'
+        elif 'M' in open_risks['impact'].values:
+            risk_color = '#f59e0b' # Amber (Medium)
+            risk_icon = '!'
+        else:
+            risk_color = '#0ea5e9' # Blue (Low only)
+            risk_icon = '!'
+            
         health_data = [
-            ('Scope', COLORS['status_active'], '✓'),
+            ('Scope', '#10b981', '✓'),
             ('Schedule', 
-             COLORS['status_active'] if m['schedule_health'] == 'Green' else COLORS['status_not_started'], 
+             '#10b981' if m['schedule_health'] == 'Green' else '#ef4444', 
              '✓' if m['schedule_health'] == 'Green' else '!'),
             ('Budget', 
-             COLORS['status_active'] if m['budget_health'] == 'Green' else (COLORS['status_not_started'] if m['budget_health'] == 'Yellow' else COLORS['status_critical']), 
+             '#10b981' if m['budget_health'] == 'Green' else ('#f59e0b' if m['budget_health'] == 'Yellow' else '#ef4444'), 
              '✓' if m['budget_health'] == 'Green' else '!'),
-            ('Resources', COLORS['status_active'], '✓')
+            ('Resources', '#10b981', '✓'),
+            ('Risk', risk_color, risk_icon)
         ]
         
-        health_html = '<div class="health-container">'
+        health_html = '<div class="health-container" style="justify-content: space-between; display: flex; padding: 1.5rem 1rem;">'
         for label, hex_color, icon in health_data:
-            is_active = (hex_color == COLORS['status_active'] or hex_color == COLORS['status_complete'])
-            text_color = "white" if is_active else hex_color
-            border = "none" if is_active else f"3px solid {hex_color}"
-            inner_bg = hex_color if is_active else "white"
-            health_html += f"""<div class="health-item"><div class="health-icon" style="background-color: {inner_bg}; color: {text_color}; border: {border};">{icon}</div><div class="health-label">{label}</div></div>"""
+            text_color = "white"
+            border = "none"
+            inner_bg = hex_color
+            health_html += f'<div class="health-item" style="display: flex; flex-direction: column; align-items: center; gap: 6px; flex: 1;"><div class="health-icon" style="background-color: {inner_bg}; color: {text_color}; border: {border}; width: 38px; height: 38px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; font-weight: bold; box-shadow: 0 4px 10px rgba(0,0,0,0.1);">{icon}</div><div class="health-label" style="font-size: 0.75rem; font-weight: 600; text-align: center; white-space: nowrap;">{label}</div></div>'
         health_html += '</div>'
         st.markdown(health_html, unsafe_allow_html=True)
 
@@ -548,16 +565,20 @@ def pm_dashboard():
         st.markdown('<div style="height:10px"></div>', unsafe_allow_html=True)
         dl_cols = st.columns(min(len(all_outputs), 4))
         for i, (_, out) in enumerate(all_outputs.iterrows()):
-            file_full_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', out['file_path'])
-            if os.path.exists(file_full_path):
+            data = None
+            try:
+                data = database.download_file_from_azure(out['file_path'])
+            except:
+                pass
+
+            if data:
                 with dl_cols[i % len(dl_cols)]:
                     st.markdown('<div class="download-btn">', unsafe_allow_html=True)
-                    with open(file_full_path, "rb") as fp:
-                        st.download_button(
-                            out['file_name'], data=fp.read(),
-                            file_name=out['file_name'], key=f"dash_dl_{out['output_id']}",
-                            use_container_width=True
-                        )
+                    st.download_button(
+                        out['file_name'], data=data,
+                        file_name=out['file_name'], key=f"dash_dl_{out['output_id']}",
+                        use_container_width=True
+                    )
                     st.markdown('</div>', unsafe_allow_html=True)
     else:
         st.info("No deliverables uploaded yet. Outputs will appear here once tasks are marked as complete with uploaded files.")

@@ -7,7 +7,8 @@ import zipfile
 import os
 
 def generate_full_archive():
-    """Packages the DB, Excel data, and all uploads into a single ZIP file."""
+    """Packages the DB, Excel data, and all Azure uploads into a single ZIP file."""
+    from azure.storage.blob import BlobServiceClient
     output = io.BytesIO()
     
     with zipfile.ZipFile(output, 'w', zipfile.ZIP_DEFLATED) as zip_file:
@@ -19,15 +20,17 @@ def generate_full_archive():
         excel_data = export_all_data()
         zip_file.writestr('data_backup.xlsx', excel_data)
         
-        # 3. Add all Uploaded Documents
-        uploads_root = database.UPLOADS_DIR
-        if os.path.exists(uploads_root):
-            for root, dirs, files in os.walk(uploads_root):
-                for file in files:
-                    file_path = os.path.join(root, file)
-                    # Create a relative path inside the zip to maintain structure
-                    arcname = os.path.join('documents', os.path.relpath(file_path, uploads_root))
-                    zip_file.write(file_path, arcname=arcname)
+        # 3. Add all uploaded documents from Azure Blob Storage
+        try:
+            blob_service = BlobServiceClient.from_connection_string(database.AZURE_CONNECTION)
+            container = blob_service.get_container_client(database.AZURE_CONTAINER)
+            for blob in container.list_blobs(name_starts_with="uploads/"):
+                blob_data = container.get_blob_client(blob.name).download_blob().readall()
+                # store in zip as documents/<rest of path after 'uploads/'>
+                arcname = "documents/" + blob.name[len("uploads/"):]
+                zip_file.writestr(arcname, blob_data)
+        except Exception as e:
+            st.warning(f"Could not archive cloud documents: {e}")
                     
     return output.getvalue()
 
@@ -94,10 +97,10 @@ def import_from_zip(uploaded_file):
                     # Strip the 'documents/' prefix to put them back in 'uploads/'
                     filename = member.replace('documents/', '', 1)
                     if filename: # Avoid directory members
-                        target_path = os.path.join(database.UPLOADS_DIR, filename)
-                        os.makedirs(os.path.dirname(target_path), exist_ok=True)
-                        with open(target_path, 'wb') as f:
-                            f.write(zip_ref.read(member))
+                        # Ensure forward slashes for Azure Blob Storage
+                        blob_name = f"uploads/{filename}".replace('\\', '/')
+                        # Upload byte content directly to Azure
+                        database.upload_file_to_azure(zip_ref.read(member), blob_name)
                             
         st.cache_data.clear()
         return True, "System fully restored from ZIP archive (DB and Documents)!"
