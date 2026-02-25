@@ -136,6 +136,50 @@ def global_css():
         [data-testid="stSidebar"] {{
             background: linear-gradient(180deg, #1a1a2e 0%, #16213e 100%) !important;
         }}
+        
+        /* Hide the default empty header to make room for our custom one */
+        [data-testid="stSidebarHeader"] {{
+            display: none !important;
+        }}
+
+        /* Custom Brand Container (Flexbox) */
+        .custom-sidebar-header {{
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 15px;
+            margin-bottom: 10px;
+            border-bottom: 1px solid rgba(128,128,128,0.1);
+        }}
+
+        .brand-logo-img {{
+            width: 44px; /* Increased by 10% */
+            height: auto;
+        }}
+
+        .brand-text-block {{
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }}
+
+        .brand-title-main {{
+            color: white !important;
+            font-size: 1.1rem;
+            font-weight: 800;
+            line-height: 1.1;
+            letter-spacing: -0.5px;
+            font-family: 'Inter', sans-serif;
+        }}
+
+        .brand-subtitle-main {{
+            color: #38bdf8 !important;
+            font-size: 0.55rem;
+            font-weight: 700;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            font-family: 'Inter', sans-serif;
+        }}
 
         .stTabs [aria-selected="true"] {{
             color: var(--primary-light) !important;
