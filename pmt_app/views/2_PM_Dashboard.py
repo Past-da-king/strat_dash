@@ -25,13 +25,6 @@ def pm_dashboard():
     
     current_user = auth.get_current_user()
     
-    # --- TASK VIEW FILTER ---
-    st.markdown('<div style="margin-bottom: 1.5rem;">', unsafe_allow_html=True)
-    view_col1, view_col2 = st.columns([1, 2])
-    with view_col1:
-        view_mode = st.radio("Display Scope", ["All Tasks", "My Tasks"], horizontal=True, label_visibility="collapsed")
-    st.markdown('</div>', unsafe_allow_html=True)
-    
     # --- BRAND COLORS ---
     COLORS = {
         'status_not_started': '#f59e0b',
@@ -391,8 +384,7 @@ def pm_dashboard():
 
     st.markdown('<div style="height:30px"></div>', unsafe_allow_html=True)
 
-    # Fetch Activities
-    all_activities_raw = database.get_df('''
+    all_activities = database.get_df('''
         SELECT bs.*, 
                u.full_name as responsible_name,
                (CASE WHEN bs.status = 'Complete' THEN 'Complete' 
@@ -404,12 +396,6 @@ def pm_dashboard():
         LEFT JOIN users u ON bs.responsible_user_id = u.user_id
         WHERE bs.project_id = %s ORDER BY bs.planned_start
     ''', (project_id,))
-
-    # Apply Task View Filter
-    if view_mode == "My Tasks":
-        all_activities = all_activities_raw[all_activities_raw['responsible_user_id'] == current_user['id']]
-    else:
-        all_activities = all_activities_raw
 
     # --- ROW 3: TIMELINE & MILESTONES ---
     r3_col1, r3_col2 = st.columns([1, 1])

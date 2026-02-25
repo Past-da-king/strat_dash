@@ -91,14 +91,27 @@ def record_activity_page():
     selected_project_str = st.selectbox("Select Project", project_list)
     project_id = project_map[selected_project_str]
     
-    # 2. Fetch Activities with responsible person filter
-    # Personnel only see their own tasks. PM/Admin/Exec see all.
-    task_user_filter = None if is_global_role or current_user['role'] == 'pm' else current_user['id']
-    activities = database.get_baseline_schedule(project_id, user_id_filter=task_user_filter)
+    # --- ACTIVITY VIEW FILTER ---
+    st.markdown('<div style="margin-bottom: 1rem;">', unsafe_allow_html=True)
+    view_mode = st.radio("Display Scope", ["All Activities", "My Activities"], horizontal=True, label_visibility="collapsed")
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    # 2. Fetch Activities
+    # Fetch all for the project first
+    all_activities = database.get_baseline_schedule(project_id)
     
-    if activities is None or activities.empty:
-        st.warning("No activities found for you in this project.")
+    if all_activities is None or all_activities.empty:
+        st.warning("No activities found for this project.")
         st.stop()
+
+    # Apply filter based on toggle
+    if view_mode == "My Activities":
+        activities = all_activities[all_activities['responsible_user_id'] == current_user['id']]
+        if activities.empty:
+            st.info("You have no activities assigned to you in this project.")
+            st.stop()
+    else:
+        activities = all_activities
     
     st.divider()
     

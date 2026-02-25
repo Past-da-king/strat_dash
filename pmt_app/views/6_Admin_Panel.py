@@ -116,18 +116,28 @@ def admin_panel():
             st.markdown('</div>', unsafe_allow_html=True)
             
         with col2:
-            st.markdown("#### 📥 Import Data")
-            st.warning("⚠️ **DANGER**: Importing data will DELETE all current information and replace it with the contents of the Excel file.")
-            uploaded_file = st.file_uploader("Upload Backup Excel", type=["xlsx"])
+            st.markdown("#### 📥 Import & Restore")
+            st.warning("⚠️ **DANGER**: Restoring data will OVERWRITE current information.")
+            uploaded_file = st.file_uploader("Upload Backup (.xlsx, .db, or .zip)", type=["xlsx", "db", "zip"])
+            
             if uploaded_file:
                 st.markdown('<div class="delete-btn">', unsafe_allow_html=True)
-                if st.button("RESTORE DATABASE", use_container_width=True):
-                    success, msg = data_mgmt.import_all_data(uploaded_file)
-                    if success:
-                        st.success(msg)
-                        st.balloons()
-                    else:
-                        st.error(msg)
+                if st.button("RESTORE FROM FILE", use_container_width=True):
+                    with st.spinner("Processing restoration..."):
+                        if uploaded_file.name.endswith('.xlsx'):
+                            success, msg = data_mgmt.import_all_data(uploaded_file)
+                        elif uploaded_file.name.endswith('.db'):
+                            success, msg = data_mgmt.import_from_db(uploaded_file)
+                        elif uploaded_file.name.endswith('.zip'):
+                            success, msg = data_mgmt.import_from_zip(uploaded_file)
+                        else:
+                            success, msg = False, "Unsupported file format."
+                            
+                        if success:
+                            st.success(msg)
+                            st.balloons()
+                        else:
+                            st.error(msg)
                 st.markdown('</div>', unsafe_allow_html=True)
 
         st.divider()

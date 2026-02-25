@@ -26,7 +26,7 @@ def generate_full_archive():
                 for file in files:
                     file_path = os.path.join(root, file)
                     # Create a relative path inside the zip to maintain structure
-                    arcname = os.path.join('documents', os.relpath(file_path, uploads_root))
+                    arcname = os.path.join('documents', os.path.relpath(file_path, uploads_root))
                     zip_file.write(file_path, arcname=arcname)
                     
     return output.getvalue()
@@ -63,6 +63,46 @@ def export_all_data():
                 pd.DataFrame(columns=[table]).to_excel(writer, sheet_name=table, index=False)
                 
     return output.getvalue()
+
+import shutil
+
+def import_from_db(uploaded_file):
+    """Replaces the current SQLite database with the uploaded .db file."""
+    try:
+        # Close connection to current DB first if possible (though SQLite handles this ok)
+        with open(database.SQLITE_DB_PATH, 'wb') as f:
+            f.write(uploaded_file.getbuffer())
+        st.cache_data.clear()
+        return True, "Database restored successfully from .db file!"
+    except Exception as e:
+        return False, f"DB Restoration failed: {str(e)}"
+
+def import_from_zip(uploaded_file):
+    """Restores the entire system (DB + Documents) from a ZIP archive."""
+    try:
+        with zipfile.ZipFile(uploaded_file, 'r') as zip_ref:
+            # 1. Restore Database
+            if 'database/pm_tool.db' in zip_ref.namelist():
+                db_data = zip_ref.read('database/pm_tool.db')
+                with open(database.SQLITE_DB_PATH, 'wb') as f:
+                    f.write(db_data)
+            
+            # 2. Restore Documents
+            # Extract only files starting with 'documents/' to the uploads folder
+            for member in zip_ref.namelist():
+                if member.startswith('documents/'):
+                    # Strip the 'documents/' prefix to put them back in 'uploads/'
+                    filename = member.replace('documents/', '', 1)
+                    if filename: # Avoid directory members
+                        target_path = os.path.join(database.UPLOADS_DIR, filename)
+                        os.makedirs(os.path.dirname(target_path), exist_ok=True)
+                        with open(target_path, 'wb') as f:
+                            f.write(zip_ref.read(member))
+                            
+        st.cache_data.clear()
+        return True, "System fully restored from ZIP archive (DB and Documents)!"
+    except Exception as e:
+        return False, f"ZIP Restoration failed: {str(e)}"
 
 def import_all_data(uploaded_file):
     """Imports data from a multi-sheet Excel workbook into the database."""
