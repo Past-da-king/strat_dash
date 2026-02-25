@@ -289,6 +289,17 @@ def pm_dashboard():
         available_cols = [c for c in display_cols if c in milestones_df.columns]
         st.dataframe(milestones_df[available_cols], use_container_width=True, hide_index=True)
 
+    @st.dialog("Full Risk Register", width="large")
+    def show_full_risks(project_id):
+        df = database.get_project_risks(project_id)
+        if df.empty:
+            st.info("No risks recorded.")
+            return
+        st.markdown("### Extended Risk Register")
+        display_cols = ['date_identified', 'description', 'impact', 'status', 'mitigation_action']
+        available_cols = [c for c in display_cols if c in df.columns]
+        st.dataframe(df[available_cols], use_container_width=True, hide_index=True)
+
     # --- ROW 1: SCHEDULE & KEY METRICS ---
     r1_col1, r1_col2 = st.columns([1, 1])
     
@@ -554,7 +565,13 @@ def pm_dashboard():
     st.markdown('<div style="height:30px"></div>', unsafe_allow_html=True)
 
     # --- ROW 6: RISK REGISTER ---
-    st.markdown("### Risk Register")
+    col_rk_h, col_rk_b = st.columns([3, 1])
+    with col_rk_h: st.markdown("### Risk Register")
+    with col_rk_b:
+        st.markdown('<div class="list-btn">', unsafe_allow_html=True)
+        if st.button("Full View", key="btn_full_rk", use_container_width=True): show_full_risks(project_id)
+        st.markdown('</div>', unsafe_allow_html=True)
+
     risks = database.get_project_risks(project_id)
     
     if not risks.empty:
@@ -562,7 +579,7 @@ def pm_dashboard():
         
         with r4_col1:
             risk_html = '<div style="background-color: var(--card-bg); padding: 15px; border-radius: 12px; border: 1px solid rgba(128, 128, 128, 0.1); box-shadow: 0 2px 5px rgba(0,0,0,0.02);">'
-            for _, row in risks.iterrows():
+            for _, row in risks.head(2).iterrows():
                 impact_code = row['impact']
                 impact_color = COLORS['risk_high'] if impact_code == 'H' else (COLORS['risk_medium'] if impact_code == 'M' else COLORS['risk_low'])
                 status_icon = "High" if impact_code == 'H' else ("Med" if impact_code == 'M' else "Low")

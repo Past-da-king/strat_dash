@@ -48,18 +48,19 @@ def home_view():
 
     st.markdown(
         f"""
-    <div style="background: rgba(255, 255, 255, 0.05); padding: 2.5rem; border-radius: 16px; border: 1px solid rgba(128, 128, 128, 0.2); box-shadow: 0 4px 20px rgba(0,0,0,0.1); text-align: center; margin-top: 2rem;">
-        <div style="font-size: 1.5rem; opacity: 0.8; margin-bottom: 0.5rem;">Hello,</div>
-        <div style="font-size: 2.5rem; font-weight: 700; color: #0ea5e9; margin-bottom: 1rem;">{user["full_name"]}</div>
-        <div style="display: inline-block; padding: 4px 12px; background: rgba(14, 165, 233, 0.1); color: #0ea5e9; border-radius: 20px; font-weight: 600; font-size: 0.85rem; margin-bottom: 2rem;">
-            {user["role"].upper()} ACCESS
+    <div style="background: rgba(255, 255, 255, 0.05); padding: 2rem; border-radius: 16px; border: 1px solid rgba(128, 128, 128, 0.2); box-shadow: 0 4px 20px rgba(0,0,0,0.1); display: flex; align-items: center; justify-content: space-between; margin-top: 2rem; margin-bottom: 2rem; flex-wrap: wrap; gap: 1rem;">
+        <div>
+            <div style="font-size: 1.2rem; opacity: 0.8; margin-bottom: 0.2rem;">Welcome back,</div>
+            <div style="font-size: 2.2rem; font-weight: 700; color: #0ea5e9; margin-bottom: 0.5rem; letter-spacing: -0.5px;">{user["full_name"]}</div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <div style="padding: 4px 12px; background: rgba(14, 165, 233, 0.1); color: #0ea5e9; border-radius: 20px; font-weight: 600; font-size: 0.85rem;">
+                    {user["role"].upper()} ACCESS
+                </div>
+            </div>
         </div>
-        <div style="opacity: 0.8; margin-bottom: 1.5rem;">
-            Welcome to the Strat Edge Project Performance Portal.
-        </div>
-        <div style="background: rgba(12, 74, 110, 0.2); padding: 1.5rem; border-radius: 12px; margin-top: 1rem; border: 1px dashed rgba(14, 165, 233, 0.4);">
-            <div style="font-weight: 700; color: #38bdf8; font-size: 0.95rem; margin-bottom: 4px;">STRAT EDGE SOLUTIONS</div>
-            <div style="font-size: 0.8rem; font-style: italic; opacity: 0.9;">"Turning Insight into Advantage"</div>
+        <div style="text-align: right; opacity: 0.8; max-width: 350px;">
+            <i class="fas fa-chart-line fa-2x" style="color: #38bdf8; margin-bottom: 10px;"></i>
+            <div style="font-size: 0.95rem; line-height: 1.5;">Select a module below to manage your projects, track performance, or configure the system.</div>
         </div>
     </div>
     """,
