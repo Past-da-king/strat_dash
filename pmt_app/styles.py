@@ -137,48 +137,83 @@ def global_css():
             background: linear-gradient(180deg, #1a1a2e 0%, #16213e 100%) !important;
         }}
         
-        /* Hide the default empty header to make room for our custom one */
-        [data-testid="stSidebarHeader"] {{
-            display: none !important;
+        /* THE ULTIMATE FIX: Force Sidebar ordering */
+        [data-testid="stSidebarContent"] {{
+            display: flex !important;
+            flex-direction: column !important;
+            position: relative !important;
         }}
 
-        /* Custom Brand Container (Flexbox) */
+        /* Pin the collapse arrow (header) to the top right */
+        [data-testid="stSidebarHeader"] {{
+            position: absolute !important;
+            top: 10px !important;
+            right: 5px !important;
+            z-index: 1000 !important;
+            background: transparent !important;
+            padding: 0 !important;
+            min-height: 0 !important;
+            width: 40px !important;
+        }}
+
+        /* Pull our custom markdown to the very top */
+        [data-testid="stSidebarUserContent"] {{
+            order: -1 !important;
+            padding-top: 0 !important;
+            padding-bottom: 0 !important;
+        }}
+
+        /* Clean Flexbox Branding Container */
         .custom-sidebar-header {{
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            padding: 10px 15px;
-            margin-bottom: 10px;
-            border-bottom: 1px solid rgba(128,128,128,0.1);
+            display: flex !important;
+            align-items: center !important;
+            gap: 10px !important;
+            padding: 15px 50px 10px 15px !important; /* Reduced bottom padding */
+            margin-bottom: 30px !important; /* Added 30px margin below the border */
+            border-bottom: 1px solid rgba(128,128,128,0.1) !important;
         }}
 
         .brand-logo-img {{
-            width: 44px; /* Increased by 10% */
-            height: auto;
+            width: 44px !important;
+            height: auto !important;
+            flex-shrink: 0 !important;
         }}
 
         .brand-text-block {{
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
+            display: flex !important;
+            flex-direction: column !important;
+            line-height: 1 !important;
         }}
 
         .brand-title-main {{
             color: white !important;
-            font-size: 1.1rem;
-            font-weight: 800;
-            line-height: 1.1;
-            letter-spacing: -0.5px;
-            font-family: 'Inter', sans-serif;
+            font-size: 1.15rem !important;
+            font-weight: 800 !important;
+            letter-spacing: -0.5px !important;
+            font-family: 'Inter', sans-serif !important;
+            margin: 0 !important;
+            padding: 0 !important;
         }}
 
         .brand-subtitle-main {{
             color: #38bdf8 !important;
-            font-size: 0.55rem;
-            font-weight: 700;
-            letter-spacing: 2px;
-            text-transform: uppercase;
-            font-family: 'Inter', sans-serif;
+            font-size: 0.58rem !important;
+            font-weight: 700 !important;
+            letter-spacing: 1.5px !important;
+            text-transform: uppercase !important;
+            font-family: 'Inter', sans-serif !important;
+            margin-top: 2px !important;
+        }}
+
+        /* Keep the header for the collapse button (the arrow) but remove its bulk */
+        [data-testid="stSidebarHeader"] {{
+            padding: 0 !important;
+            min-height: 0 !important;
+            background: transparent !important;
+        }}
+        
+        [data-testid="stSidebarHeader"] button {{
+            margin-top: 5px !important;
         }}
 
         .stTabs [aria-selected="true"] {{

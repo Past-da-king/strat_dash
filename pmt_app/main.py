@@ -172,7 +172,8 @@ def main():
         user = auth.get_current_user()
         role = user['role']
         
-        # --- GLOBAL BRANDING (FLEXBOX) ---
+        # --- GLOBAL BRANDING (FLEXBOX CONTAINER) ---
+        # Positioned at top via styles.py CSS [order: -1]
         st.sidebar.markdown(f"""
             <div class="custom-sidebar-header">
                 <img src="data:image/png;base64,{LOGO_B64}" class="brand-logo-img" />
@@ -181,23 +182,6 @@ def main():
                     <div class="brand-subtitle-main">PROJECT PORTAL</div>
                 </div>
             </div>
-            <style>
-                /* Force this container to the very top */
-                [data-testid="stSidebarNav"] {{
-                    margin-top: -15px !important;
-                }}
-                section[data-testid="stSidebar"] .stMarkdown:first-child {{
-                    position: absolute;
-                    top: 0;
-                    width: 100%;
-                    background: transparent;
-                    z-index: 100;
-                }}
-                /* Push navigation down to make room for pinned header */
-                [data-testid="stSidebarNav"] {{
-                    padding-top: 80px !important;
-                }}
-            </style>
         """, unsafe_allow_html=True)
 
         # Define Pages
