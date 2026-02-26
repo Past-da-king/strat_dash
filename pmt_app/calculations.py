@@ -347,6 +347,66 @@ def get_burndown_data(project_id):
         logger.error(f"Error building burndown data for project {project_id}: {e}")
         return None
 
+@st.cache_data(ttl=600)
+def get_activity_burndown_data(project_id):
+    """
+    Calculates Task Burndown data:
+      - Ideal: Tasks finishing as per baseline planned_finish dates.
+      - Actual: Tasks finishing as per activity_log event_date.
+    """
+    try:
+        # 1. Get all activities and their planned finish dates
+        activities = database.get_df(
+            "SELECT activity_id, planned_finish FROM baseline_schedule WHERE project_id = %s",
+            (project_id,)
+        )
+        if activities.empty:
+            return None
+
+        total_tasks = len(activities)
+        activities['planned_finish'] = pd.to_datetime(activities['planned_finish'])
+        
+        # 2. Build Ideal Line
+        ideal_points = activities.groupby('planned_finish').size().reset_index(name='count')
+        ideal_points = ideal_points.sort_values('planned_finish')
+        ideal_points['cumulative_done'] = ideal_points['count'].cumsum()
+        ideal_points['remaining'] = total_tasks - ideal_points['cumulative_done']
+        
+        # Add start point (Day 0)
+        start_date = activities['planned_finish'].min() - timedelta(days=1)
+        anchor_ideal = pd.DataFrame({'date': [start_date], 'remaining': [total_tasks]})
+        ideal_df = pd.concat([anchor_ideal, ideal_points.rename(columns={'planned_finish': 'date'})[['date', 'remaining']]], ignore_index=True)
+
+        # 3. Build Actual Line
+        actual_logs = database.get_df("""
+            SELECT al.event_date, al.activity_id
+            FROM activity_log al
+            JOIN baseline_schedule bs ON al.activity_id = bs.activity_id
+            WHERE bs.project_id = %s AND al.event_type = 'FINISHED'
+            ORDER BY al.event_date
+        """, (project_id,))
+
+        if not actual_logs.empty:
+            actual_logs['event_date'] = pd.to_datetime(actual_logs['event_date'])
+            actual_points = actual_logs.groupby('event_date').size().reset_index(name='count')
+            actual_points['cumulative_done'] = actual_points['count'].cumsum()
+            actual_points['remaining'] = total_tasks - actual_points['cumulative_done']
+            
+            anchor_actual = pd.DataFrame({'date': [start_date], 'remaining': [total_tasks]})
+            actual_df = pd.concat([anchor_actual, actual_points.rename(columns={'event_date': 'date'})[['date', 'remaining']]], ignore_index=True)
+        else:
+            actual_df = pd.DataFrame({'date': [start_date], 'remaining': [total_tasks]})
+
+        return {
+            "total_tasks": total_tasks,
+            "ideal_df": ideal_df,
+            "actual_df": actual_df,
+            "today": pd.Timestamp.now().normalize()
+        }
+    except Exception as e:
+        logger.error(f"Error calculating activity burndown: {e}")
+        return None
+
 def get_network_diagram_data(project_id):
     """
     Calculates the Critical Path and dependency metrics for the network diagram.

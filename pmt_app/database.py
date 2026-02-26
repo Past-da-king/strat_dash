@@ -413,8 +413,8 @@ def add_expenditure(data, user_id):
 # ============================================================
 def add_baseline_activity(data):
     query = """
-    INSERT INTO baseline_schedule (project_id, activity_name, planned_start, planned_finish, budgeted_cost, responsible_user_id, expected_output)
-    VALUES (%s, %s, %s, %s, %s, %s, %s)
+    INSERT INTO baseline_schedule (project_id, activity_name, planned_start, planned_finish, budgeted_cost, responsible_user_id, expected_output, depends_on)
+    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
     """
     params = (
         data["project_id"],
@@ -424,8 +424,38 @@ def add_baseline_activity(data):
         data["budgeted_cost"],
         data.get("responsible_user_id"),
         data.get("expected_output"),
+        data.get("depends_on")
     )
     return execute_query(query, params, commit=True)
+
+
+def update_baseline_activity(activity_id, data):
+    """Surgically update an existing activity."""
+    query = """
+    UPDATE baseline_schedule 
+    SET activity_name = %s, planned_start = %s, planned_finish = %s, 
+        budgeted_cost = %s, responsible_user_id = %s, expected_output = %s, 
+        depends_on = %s, status = %s
+    WHERE activity_id = %s
+    """
+    params = (
+        data["activity_name"],
+        data["planned_start"],
+        data["planned_finish"],
+        data["budgeted_cost"],
+        data.get("responsible_user_id"),
+        data.get("expected_output"),
+        data.get("depends_on"),
+        data.get("status", "Not Started"),
+        activity_id
+    )
+    execute_query(query, params, commit=True)
+
+
+def delete_baseline_activity(activity_id):
+    """Delete an activity and clear dependencies pointing to it."""
+    execute_query("UPDATE baseline_schedule SET depends_on = NULL WHERE depends_on = %s", (activity_id,), commit=True)
+    execute_query("DELETE FROM baseline_schedule WHERE activity_id = %s", (activity_id,), commit=True)
 
 
 def get_baseline_schedule(project_id, user_id_filter=None):
