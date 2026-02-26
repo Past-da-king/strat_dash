@@ -129,7 +129,7 @@ def record_activity_page():
             
             uploaded_files = st.file_uploader(
                 f"Select {doc_type}(s) *",
-                type=['pdf', 'docx', 'xlsx', 'png', 'jpg', 'jpeg', 'csv', 'zip'],
+                type=['pdf', 'docx', 'doc', 'xlsx', 'xls', 'pptx', 'ppt', 'png', 'jpg', 'jpeg', 'csv', 'zip'],
                 accept_multiple_files=True,
                 key=f"upload_{activity_id}_{doc_type}"
             )

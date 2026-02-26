@@ -137,6 +137,7 @@ def project_repository_page():
         if ext == 'pdf': return '<i class="fas fa-file-pdf" style="color: #ef4444;"></i>'
         if ext in ['xlsx', 'xls', 'csv']: return '<i class="fas fa-file-excel" style="color: #10b981;"></i>'
         if ext in ['docx', 'doc']: return '<i class="fas fa-file-word" style="color: #0ea5e9;"></i>'
+        if ext in ['pptx', 'ppt']: return '<i class="fas fa-file-powerpoint" style="color: #ea580c;"></i>'
         return '<i class="fas fa-file-alt" style="color: #94a3b8;"></i>'
 
     def make_download_link(data_bytes, filename, label="Download"):
@@ -205,7 +206,7 @@ def project_repository_page():
                             database.create_repo_folder(project_id, f_name, current_folder, current_user['id'])
                             st.rerun()
                     with s_t2:
-                        files = st.file_uploader("Select", accept_multiple_files=True, key="f_u_input")
+                        files = st.file_uploader("Select", accept_multiple_files=True, type=['pdf', 'docx', 'doc', 'xlsx', 'xls', 'pptx', 'ppt', 'png', 'jpg', 'jpeg', 'csv', 'zip'], key="f_u_input")
                         if files and st.button("Upload", use_container_width=True):
                             for f in files:
                                 blob = f"uploads/projects/{project_id}/repo/{f.name}"
