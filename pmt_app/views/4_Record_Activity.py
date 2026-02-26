@@ -149,15 +149,22 @@ def record_activity_page():
                     
                     # Automatic status progression
                     if doc_type == "First Draft":
-                        database.update_activity_status(activity_id, 'Active', current_user['id'])
-                        st.success("First Draft(s) uploaded! Task is now officially STARTED.")
+                        success, msg = database.update_activity_status(activity_id, 'Active', current_user['id'])
+                        if success:
+                            st.success("First Draft(s) uploaded! Task is now officially STARTED.")
+                            st.rerun()
+                        else:
+                            st.error(f"Files uploaded, but status update failed: {msg}")
                     elif doc_type == "Final Document":
-                        database.update_activity_status(activity_id, 'Complete', current_user['id'])
-                        st.success("Final Document(s) uploaded! Task is now COMPLETE.")
+                        success, msg = database.update_activity_status(activity_id, 'Complete', current_user['id'])
+                        if success:
+                            st.success("Final Document(s) uploaded! Task is now COMPLETE.")
+                            st.rerun()
+                        else:
+                            st.error(f"Files uploaded, but status update failed: {msg}")
                     else:
                         st.success(f"{len(uploaded_files)} {doc_type}(s) uploaded successfully.")
-                    
-                    st.rerun()
+                        st.rerun()
         
         # --- Summary Stats (Scoped to visible activities) ---
         total = len(activities)
@@ -251,8 +258,11 @@ def record_activity_page():
                         if is_privileged:
                             st.markdown('<div class="refresh-btn">', unsafe_allow_html=True)
                             if st.button("Reopen Task", key=f"btn_{row['activity_id']}", use_container_width=True):
-                                database.update_activity_status(row['activity_id'], 'Active', current_user['id'])
-                                st.rerun()
+                                success, msg = database.update_activity_status(row['activity_id'], 'Active', current_user['id'])
+                                if success:
+                                    st.rerun()
+                                else:
+                                    st.error(msg)
                             st.markdown('</div>', unsafe_allow_html=True)
                         else:
                             st.markdown('<div class="check-btn" style="opacity:0.5;">', unsafe_allow_html=True)

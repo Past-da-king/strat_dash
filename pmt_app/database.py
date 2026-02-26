@@ -333,30 +333,13 @@ def get_projects(pm_id=None, user_id=None):
 # ============================================================
 def update_activity_status(activity_id, new_status, user_id):
     """
-    Updates activity status with dependency checks.
+    Updates activity status.
     """
     current_act = execute_query(
         "SELECT * FROM baseline_schedule WHERE activity_id = %s", (activity_id,)
     )
     if not current_act:
         return False, "Activity not found."
-
-    current_act = current_act[0]
-    dep_id = current_act["depends_on"]
-
-    if new_status in ["Active", "Complete"] and dep_id:
-        dep_act = execute_query(
-            "SELECT status FROM baseline_schedule WHERE activity_id = %s", (dep_id,)
-        )
-        if dep_act and dep_act[0]["status"] != "Complete":
-            dep_name = execute_query(
-                "SELECT activity_name FROM baseline_schedule WHERE activity_id = %s",
-                (dep_id,),
-            )[0]["activity_name"]
-            return (
-                False,
-                f"Cannot progress. Predecessor '{dep_name}' must be 'Complete' first.",
-            )
 
     query = "UPDATE baseline_schedule SET status = %s WHERE activity_id = %s"
     execute_query(query, (new_status, activity_id), commit=True)

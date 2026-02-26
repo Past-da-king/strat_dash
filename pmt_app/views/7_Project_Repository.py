@@ -114,24 +114,7 @@ def project_repository_page():
     st.divider()
 
     # --- CORE REPO TABS ---
-    # --- ACTION HANDLERS (From Query Params) ---
-    params = st.query_params
-    if 'del_repo' in params:
-        database.delete_repo_item(int(params['del_repo']))
-        st.query_params.clear()
-        st.rerun()
-    if 'del_act' in params:
-        database.delete_task_output(int(params['del_act']))
-        st.query_params.clear()
-        st.rerun()
-    if 'del_risk' in params:
-        risk_id = int(params['del_risk'])
-        path = params.get('path')
-        if path:
-            database.remove_risk_closure_file(risk_id, path)
-            st.query_params.clear()
-            st.rerun()
-            
+    # Removed Query Param-based Action Handlers to prevent Streamlit Cloud Logouts
     # --- CORE REPO TABS ---
     # Clean text-based tabs as requested
     tab_repo, tab_act, tab_risk = st.tabs(["Global Repository", "Activity Outputs", "Risk Closure Proofs"])
@@ -147,7 +130,8 @@ def project_repository_page():
             padding: 8px !important;
         }
         
-        div.stApp div[data-testid="stPopoverContent"] a {
+        /* Make Streamlit buttons inside popovers look like plain text links */
+        div.stApp div[data-testid="stPopoverContent"] button {
             display: block !important;
             padding: 4px 0 !important;
             color: #38bdf8 !important;
@@ -155,17 +139,24 @@ def project_repository_page():
             font-size: 0.95rem !important;
             background: none !important;
             border: none !important;
+            box-shadow: none !important;
+            text-align: left !important;
+            justify-content: flex-start !important;
+            width: 100% !important;
+            min-height: unset !important;
         }
         
-        div.stApp div[data-testid="stPopoverContent"] a:hover {
+        div.stApp div[data-testid="stPopoverContent"] button:hover {
             text-decoration: underline !important;
             color: #7dd3fc !important;
+            background: none !important;
         }
         
-        div.stApp div[data-testid="stPopoverContent"] .del-link {
+        /* Delete Text Style */
+        div.stApp div[data-testid="stPopoverContent"] button[key*="del_"] {
             color: #f87171 !important;
         }
-        div.stApp div[data-testid="stPopoverContent"] .del-link:hover {
+        div.stApp div[data-testid="stPopoverContent"] button[key*="del_"]:hover {
             color: #ef4444 !important;
         }
 
@@ -309,8 +300,10 @@ def project_repository_page():
                                     st.markdown(make_download_link(data, item['name'], "Download Permanent"), unsafe_allow_html=True)
                                 except: st.caption("File missing")
                             
-                            # Delete Link (Raw HTML to bypass button styles)
-                            st.markdown(f'<a href="?del_repo={item["file_id"]}" target="_self" class="del-link">Delete Permanent</a>', unsafe_allow_html=True)
+                            # Delete Action (In-place button styled as text link)
+                            if st.button("Delete Permanent", key=f"del_repo_{item['file_id']}"):
+                                database.delete_repo_item(item['file_id'])
+                                st.rerun()
                             render_linked_context('R', item['file_id'])
                 st.markdown('</div>', unsafe_allow_html=True)
                 
@@ -342,8 +335,10 @@ def project_repository_page():
                                     st.markdown(make_download_link(data, out['file_name'], "Download Permanent"), unsafe_allow_html=True)
                                 except: st.caption("File missing")
                                 
-                                # Delete Link
-                                st.markdown(f'<a href="?del_act={out["output_id"]}" target="_self" class="del-link">Delete Permanent</a>', unsafe_allow_html=True)
+                                # Delete Action (In-place button styled as text link)
+                                if st.button("Delete Permanent", key=f"del_act_{out['output_id']}"):
+                                    database.delete_task_output(out['output_id'])
+                                    st.rerun()
                                 render_linked_context('A', out['output_id'])
 
     # =========================================================================
@@ -375,8 +370,10 @@ def project_repository_page():
                                     st.markdown(make_download_link(data, fname, "Download Permanent"), unsafe_allow_html=True)
                                 except: st.caption("File missing")
                                 
-                                # Delete Link
-                                st.markdown(f'<a href="?del_risk={r["risk_id"]}&path={p}" target="_self" class="del-link">Delete Permanent</a>', unsafe_allow_html=True)
+                                # Delete Action (In-place button styled as text link)
+                                if st.button("Delete Permanent", key=f"del_risk_{r['risk_id']}_{hash(p)}"):
+                                    database.remove_risk_closure_file(r['risk_id'], p)
+                                    st.rerun()
                                 render_linked_context('K', r['risk_id'])
 
 
