@@ -11,6 +11,7 @@ from database import (
 import secrets
 from datetime import datetime, timedelta
 import security
+import audit
 
 def init_session():
     if "user" not in st.session_state:
@@ -83,10 +84,40 @@ def login(username, password):
         # Reset rate limit on successful login
         security.reset_rate_limit(f"login_{username}")
         
+        # AUDIT: Log successful login
+        audit.log_audit(
+            event_type="LOGIN",
+            category="AUTH",
+            description=f"User {username} logged in successfully",
+            metadata={
+                "username": username,
+                "user_id": user["user_id"],
+                "role": user["role"],
+                "ip": audit.get_ip_address()
+            },
+            user_id=user["user_id"]
+        )
+        
+        # Start session tracking
+        audit.start_session_tracking()
+        
         return True
     else:
         # Record failed attempt
         security.record_attempt(f"login_{username}")
+        
+        # AUDIT: Log failed login attempt
+        audit.log_audit(
+            event_type="LOGIN_FAILED",
+            category="AUTH",
+            description=f"Failed login attempt for user {username}",
+            metadata={
+                "username": username,
+                "ip": audit.get_ip_address(),
+                "remaining_attempts": remaining
+            }
+        )
+        
         return False
 
 def register(username, password, full_name, role="pm"):
@@ -124,6 +155,24 @@ def register(username, password, full_name, role="pm"):
 
 def logout():
     """Securely logout and clear all session data."""
+    user = st.session_state.get("user", {})
+    user_id = user.get("id")
+    username = user.get("username")
+    
+    # AUDIT: Log logout and session duration BEFORE clearing session
+    if user_id:
+        audit.end_session_tracking()
+        audit.log_audit(
+            event_type="LOGOUT",
+            category="AUTH",
+            description=f"User {username} logged out",
+            metadata={
+                "username": username,
+                "user_id": user_id
+            },
+            user_id=user_id
+        )
+    
     token = st.session_state.get("user", {}).get("token")
     if token:
         delete_session_token(token)

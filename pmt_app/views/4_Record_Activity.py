@@ -7,6 +7,7 @@ import os
 import styles
 import base64
 import security
+import audit
 
 # Page Config
 st.set_page_config(page_title="PM Tool - Record Activity", layout="wide")
@@ -303,31 +304,48 @@ def record_activity_page():
                             # List links vertically for a cleaner "File Explorer" feel
                             for _, out in outputs.iterrows():
                                 blob_name = out['file_path']
-                                data = None
-                                try:
-                                    data = database.download_file_from_azure(blob_name)
-                                except:
-                                    pass
-
-                                if data:
-                                    b64 = base64.b64encode(data).decode()
-                                    
-                                    # Determine icon based on doc_type or filename
-                                    icon = "fa-file-pdf" if out['file_name'].endswith('.pdf') else "fa-file-alt"
-                                    label_color = "#34d399" if out.get('doc_type') == 'Final Document' else "#38bdf8"
-                                    
-                                    st.markdown(f"""
-                                        <div style="margin-bottom: 8px; display: flex; align-items: center; gap: 10px;">
-                                            <i class="fas {icon}" style="color: {label_color};"></i>
-                                            <a href="data:application/octet-stream;base64,{b64}" download="{out['file_name']}" 
-                                               style="color: {label_color}; text-decoration: none; font-size: 0.85rem; font-weight: 500;">
-                                               {out['file_name']}
-                                            </a>
-                                            <span style="font-size: 0.7rem; color: #94a3b8; margin-left: auto;">
-                                                Uploaded by {out['uploader_name']} on {str(out['uploaded_at'])[:10]}
-                                            </span>
-                                        </div>
-                                    """, unsafe_allow_html=True)
+                                
+                                # Create download button with tracking
+                                file_downloaded = st.button(
+                                    f"📥 {out['file_name']}",
+                                    key=f"dl_act_{out['output_id']}",
+                                    help=f"Downloaded by {out['uploader_name']} on {str(out['uploaded_at'])[:10]}",
+                                    use_container_width=True
+                                )
+                                
+                                if file_downloaded:
+                                    try:
+                                        data = database.download_file_from_azure(blob_name)
+                                        
+                                        # Get file size for audit
+                                        try:
+                                            blob_client = database.get_blob_client(blob_name)
+                                            props = blob_client.get_blob_properties()
+                                            file_size = props.size
+                                        except:
+                                            file_size = len(data) if data else 0
+                                        
+                                        # AUDIT: Track download
+                                        audit.track_file_download(
+                                            file_name=out['file_name'],
+                                            file_size=file_size,
+                                            file_type=out['file_name'].rsplit('.', 1)[-1] if '.' in out['file_name'] else 'unknown',
+                                            location="record_activity",
+                                            file_id=out['output_id'],
+                                            project_id=None  # Will be determined from activity
+                                        )
+                                        
+                                        # Provide download
+                                        st.download_button(
+                                            label="💾 Click to Save",
+                                            data=data,
+                                            file_name=out['file_name'],
+                                            mime="application/octet-stream",
+                                            key=f"save_{out['output_id']}",
+                                            use_container_width=True
+                                        )
+                                    except Exception as e:
+                                        st.error(f"Download failed: {str(e)}")
             
             st.markdown('<div style="height:5px;"></div>', unsafe_allow_html=True)
 

@@ -9,6 +9,7 @@ import os
 import styles
 import pdf_generator
 import base64
+import audit
 
 # Page Config
 st.set_page_config(
@@ -336,30 +337,48 @@ def pm_dashboard():
     def show_full_deliverables(all_outputs):
         st.markdown("### Project Output Inventory")
         st.info("Click on a file name to download it directly.")
-        
-        # We need to render this as HTML to support the base64 download links in a "table" look
-        # but for simplicity in a dialog, a clean dataframe or repeated rows works too.
-        # However, the user wants "click to download", so I'll use a loop with download links.
-        
+
         for _, out in all_outputs.iterrows():
-            data = None
-            try:
-                data = database.download_file_from_azure(out['file_path'])
-            except:
-                pass
-            
             uploaded_date = str(out['uploaded_at'])[:10] if pd.notna(out['uploaded_at']) else 'N/A'
-            
+
             with st.container(border=True):
                 c1, c2, c3 = st.columns([2, 2, 1])
                 with c1:
                     st.markdown(f"**Task**: {out['activity_name']}")
                 with c2:
-                    if data:
-                        b64 = base64.b64encode(data).decode()
-                        st.markdown(f'<i class="fas fa-file-download" style="color:#10b981;"></i> <a href="data:application/octet-stream;base64,{b64}" download="{out["file_name"]}" style="color:#5fa2e8; text-decoration:none; font-weight:500;">{out["file_name"]}</a>', unsafe_allow_html=True)
-                    else:
-                        st.markdown(f"File: {out['file_name']} (Error)")
+                    # Download button with tracking
+                    if st.button(f"📥 {out['file_name']}", key=f"dl_pm_{out['output_id']}", use_container_width=True):
+                        try:
+                            data = database.download_file_from_azure(out['file_path'])
+                            
+                            # Get file size for audit
+                            try:
+                                blob_client = database.get_blob_client(out['file_path'])
+                                props = blob_client.get_blob_properties()
+                                file_size = props.size
+                            except:
+                                file_size = len(data) if data else 0
+                            
+                            # AUDIT: Track download
+                            audit.track_file_download(
+                                file_name=out['file_name'],
+                                file_size=file_size,
+                                file_type=out['file_name'].rsplit('.', 1)[-1] if '.' in out['file_name'] else 'unknown',
+                                location="pm_dashboard",
+                                file_id=out['output_id']
+                            )
+                            
+                            # Provide download
+                            st.download_button(
+                                label="💾 Save File",
+                                data=data,
+                                file_name=out['file_name'],
+                                mime="application/octet-stream",
+                                key=f"save_{out['output_id']}",
+                                use_container_width=True
+                            )
+                        except Exception as e:
+                            st.error(f"Download failed: {str(e)}")
                 with c3:
                     st.caption(f"By {out['uploader_name']} on {uploaded_date}")
 
@@ -630,34 +649,57 @@ def pm_dashboard():
     with col_dl_h: st.markdown("### <i class='fas fa-paperclip fa-icon'></i> Task Deliverables", unsafe_allow_html=True)
     
     all_outputs = database.get_all_outputs_for_project(project_id)
-    
+
     if not all_outputs.empty:
         with col_dl_b:
             st.markdown('<div class="list-btn">', unsafe_allow_html=True)
             if st.button("Full View", key="btn_full_dl", use_container_width=True): show_full_deliverables(all_outputs)
             st.markdown('</div>', unsafe_allow_html=True)
 
-        deliverables_html = '<div style="background-color: var(--card-bg); padding: 15px; border-radius: 12px; border: 1px solid rgba(128, 128, 128, 0.1); box-shadow: 0 2px 5px rgba(0,0,0,0.02);">'
-        deliverables_html += '<div style="display:flex; padding:8px 0; border-bottom:2px solid rgba(128, 128, 128, 0.2); margin-bottom:4px;"><span style="flex:2; font-size:0.75rem; opacity:0.8; font-weight:600; text-transform:uppercase;">Task</span><span style="flex:2; font-size:0.75rem; opacity:0.8; font-weight:600; text-transform:uppercase;">Output File (Click to Download)</span><span style="flex:1; font-size:0.75rem; opacity:0.8; font-weight:600; text-transform:uppercase;">By</span><span style="flex:1; font-size:0.75rem; opacity:0.8; font-weight:600; text-transform:uppercase;">Date</span></div>'
-        
-        # Only show first 4
+        # Show first 4 outputs with tracked downloads
         for _, out in all_outputs.head(4).iterrows():
             uploaded_date = str(out['uploaded_at'])[:10] if pd.notna(out['uploaded_at']) else 'N/A'
             
-            # Fetch data for download link
-            data = None
-            try:
-                data = database.download_file_from_azure(out['file_path'])
-            except:
-                pass
-            
-            if data:
-                b64 = base64.b64encode(data).decode()
-                file_link = f'<a href="data:application/octet-stream;base64,{b64}" download="{out["file_name"]}" style="color:#5fa2e8; text-decoration:none; font-weight:500;">{out["file_name"]}</a>'
-            else:
-                file_link = f'<span style="color:#94a3b8;">{out["file_name"]}</span>'
-
-            deliverables_html += f'<div class="deliverable-row"><span style="flex:2; font-weight:500; font-size:0.9rem;">{out["activity_name"]}</span><span style="flex:2; font-size:0.85rem;">{file_link}</span><span style="flex:1; font-size:0.8rem; opacity:0.8;">{out["uploader_name"]}</span><span style="flex:1; font-size:0.8rem; opacity:0.8;">{uploaded_date}</span></div>'
+            with st.container(border=True):
+                dl_c1, dl_c2, dl_c3 = st.columns([2, 2, 1])
+                with dl_c1:
+                    st.caption(f"**{out['activity_name']}**")
+                with dl_c2:
+                    # Download button with tracking
+                    if st.button(f"📥 {out['file_name']}", key=f"dl_pm_list_{out['output_id']}", use_container_width=True):
+                        try:
+                            data = database.download_file_from_azure(out['file_path'])
+                            
+                            # Get file size
+                            try:
+                                blob_client = database.get_blob_client(out['file_path'])
+                                props = blob_client.get_blob_properties()
+                                file_size = props.size
+                            except:
+                                file_size = len(data) if data else 0
+                            
+                            # AUDIT: Track download
+                            audit.track_file_download(
+                                file_name=out['file_name'],
+                                file_size=file_size,
+                                file_type=out['file_name'].rsplit('.', 1)[-1] if '.' in out['file_name'] else 'unknown',
+                                location="pm_dashboard_list",
+                                file_id=out['output_id']
+                            )
+                            
+                            # Provide download
+                            st.download_button(
+                                label="💾 Save",
+                                data=data,
+                                file_name=out['file_name'],
+                                mime="application/octet-stream",
+                                key=f"save_pm_{out['output_id']}",
+                                use_container_width=True
+                            )
+                        except Exception as e:
+                            st.error(f"Download failed: {str(e)}")
+                with dl_c3:
+                    st.caption(f"{out['uploader_name']}\n\n{uploaded_date}")
         
         deliverables_html += '</div>'
         st.markdown(deliverables_html, unsafe_allow_html=True)

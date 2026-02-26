@@ -5,6 +5,7 @@ import pandas as pd
 import base64
 import styles
 import security
+import audit
 from io import BytesIO
 
 # Page Config
@@ -231,6 +232,15 @@ def project_repository_page():
                                     database.upload_file_to_azure(f.getvalue(), blob, validate=True)
                                     database.add_repo_file(project_id, current_folder, safe_filename, blob, current_user['id'])
                                     success_count += 1
+                                    
+                                    # AUDIT: Track upload
+                                    audit.track_file_upload(
+                                        file_name=safe_filename,
+                                        file_size=f.size,
+                                        file_type=safe_filename.rsplit('.', 1)[-1] if '.' in safe_filename else 'unknown',
+                                        location="repository",
+                                        project_id=project_id
+                                    )
                                 except Exception as e:
                                     upload_errors.append(f"{f.name}: {str(e)}")
                             
@@ -299,6 +309,25 @@ def project_repository_page():
                                     try:
                                         with st.spinner(f"Downloading {item['name']}..."):
                                             data = database.download_file_from_azure(item['file_path'])
+                                            
+                                            # Get file size for audit
+                                            try:
+                                                blob_client = database.get_blob_client(item['file_path'])
+                                                props = blob_client.get_blob_properties()
+                                                file_size = props.size
+                                            except:
+                                                file_size = len(data)
+                                            
+                                            # AUDIT: Track download
+                                            audit.track_file_download(
+                                                file_name=item['name'],
+                                                file_size=file_size,
+                                                file_type=item['name'].rsplit('.', 1)[-1] if '.' in item['name'] else 'unknown',
+                                                location="repository",
+                                                file_id=item['file_id'],
+                                                project_id=project_id
+                                            )
+                                            
                                             st.download_button(
                                                 label="📥 Click to Save",
                                                 data=data,
@@ -366,6 +395,25 @@ def project_repository_page():
                                     try:
                                         with st.spinner(f"Downloading {out['file_name']}..."):
                                             data = database.download_file_from_azure(out['file_path'])
+                                            
+                                            # Get file size for audit
+                                            try:
+                                                blob_client = database.get_blob_client(out['file_path'])
+                                                props = blob_client.get_blob_properties()
+                                                file_size = props.size
+                                            except:
+                                                file_size = len(data)
+                                            
+                                            # AUDIT: Track download
+                                            audit.track_file_download(
+                                                file_name=out['file_name'],
+                                                file_size=file_size,
+                                                file_type=out['file_name'].rsplit('.', 1)[-1] if '.' in out['file_name'] else 'unknown',
+                                                location="activity_output",
+                                                file_id=out['output_id'],
+                                                project_id=project_id
+                                            )
+                                            
                                             st.download_button(
                                                 label="📥 Click to Save",
                                                 data=data,
@@ -432,6 +480,25 @@ def project_repository_page():
                                     try:
                                         with st.spinner(f"Downloading {fname}..."):
                                             data = database.download_file_from_azure(p)
+                                            
+                                            # Get file size for audit
+                                            try:
+                                                blob_client = database.get_blob_client(p)
+                                                props = blob_client.get_blob_properties()
+                                                file_size = props.size
+                                            except:
+                                                file_size = len(data)
+                                            
+                                            # AUDIT: Track download
+                                            audit.track_file_download(
+                                                file_name=fname,
+                                                file_size=file_size,
+                                                file_type=fname.rsplit('.', 1)[-1] if '.' in fname else 'unknown',
+                                                location="risk_proof",
+                                                file_id=r['risk_id'],
+                                                project_id=project_id
+                                            )
+                                            
                                             st.download_button(
                                                 label="📥 Click to Save",
                                                 data=data,

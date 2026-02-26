@@ -168,6 +168,37 @@ def init_repository_links_table():
 init_repository_links_table()
 
 
+def init_audit_logs_table():
+    """Initialize audit logs table for comprehensive activity tracking."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS audit_logs (
+            audit_log_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            event_type TEXT NOT NULL,
+            category TEXT NOT NULL,
+            description TEXT NOT NULL,
+            ip_address TEXT,
+            session_fingerprint TEXT,
+            metadata TEXT,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users (user_id)
+        )
+    """)
+    # Create indexes for better query performance
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_audit_user_id ON audit_logs(user_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_audit_event_type ON audit_logs(event_type)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_audit_category ON audit_logs(category)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_audit_created_at ON audit_logs(created_at)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_audit_session ON audit_logs(session_fingerprint)")
+    conn.commit()
+    conn.close()
+
+
+init_audit_logs_table()
+
+
 def execute_query(query, params=(), commit=False):
     """
     Executes a query with automatic PostgreSQL-to-SQLite translation.

@@ -331,6 +331,11 @@ def main():
             title="System Settings",
             icon=":material/settings:",
         )
+        audit_monitoring = st.Page(
+            "views/8_Audit_Monitoring.py",
+            title="Audit & Monitoring",
+            icon=":material/insights:",
+        )
 
         pages = [home_page]
 
@@ -351,6 +356,7 @@ def main():
         if role in ["admin", "executive"]:
             pages.append(admin_panel)
             pages.append(admin_settings)
+            pages.append(audit_monitoring)
 
         pg = st.navigation(pages)
         pg.run()
