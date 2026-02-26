@@ -6,6 +6,7 @@ from datetime import datetime
 import os
 import styles
 import base64
+import security
 
 # Page Config
 st.set_page_config(page_title="PM Tool - Record Activity", layout="wide")
@@ -126,27 +127,51 @@ def record_activity_page():
             st.markdown(f"### Submitting {doc_type}: **{activity_name}**")
             st.info(f"Uploading **{doc_type}(s)** is required to progress this task.")
             st.markdown("---")
-            
+
             uploaded_files = st.file_uploader(
                 f"Select {doc_type}(s) *",
-                type=['pdf', 'docx', 'doc', 'xlsx', 'xls', 'pptx', 'ppt', 'png', 'jpg', 'jpeg', 'csv', 'zip'],
+                type=list(security.ALLOWED_FILE_TYPES.keys()),
                 accept_multiple_files=True,
-                key=f"upload_{activity_id}_{doc_type}"
+                key=f"upload_{activity_id}_{doc_type}",
+                help=f"Maximum file size: {security.MAX_FILE_SIZE // (1024*1024)}MB"
             )
-            
+
             if uploaded_files:
-                st.success(f"📂 {len(uploaded_files)} file(s) selected.")
+                # Validate all files before upload
+                validation_errors = []
+                for uploaded_file in uploaded_files:
+                    is_valid, error_msg = security.validate_file_upload(uploaded_file)
+                    if not is_valid:
+                        validation_errors.append(f"{uploaded_file.name}: {error_msg}")
+                
+                if validation_errors:
+                    st.error("File validation errors:")
+                    for err in validation_errors:
+                        st.write(f"- {err}")
+                    st.stop()
+                
+                st.success(f"📂 {len(uploaded_files)} file(s) selected and validated.")
                 if st.button(f"✅ Upload {len(uploaded_files)} Document(s)", type="primary", use_container_width=True):
                     for uploaded_file in uploaded_files:
-                        # Determine blob name (path inside the container)
-                        blob_name = f"uploads/{project_id}/{activity_id}/{uploaded_file.name}"
-                        
-                        # Upload to Azure
-                        database.upload_file_to_azure(uploaded_file.getvalue(), blob_name)
-                        
-                        # Save record to DB (using the blob_name as the file_path)
-                        database.save_task_output(activity_id, uploaded_file.name, blob_name, current_user['id'], doc_type=doc_type)
-                    
+                        try:
+                            # Sanitize filename
+                            safe_filename = security.sanitize_html(uploaded_file.name)
+                            # Determine blob name (path inside the container)
+                            blob_name = f"uploads/{project_id}/{activity_id}/{safe_filename}"
+
+                            # Upload to Azure with validation
+                            database.upload_file_to_azure(uploaded_file.getvalue(), blob_name, validate=True)
+
+                            # Save record to DB (using the blob_name as the file_path)
+                            database.save_task_output(activity_id, safe_filename, blob_name, current_user['id'], doc_type=doc_type)
+                            
+                        except ValueError as e:
+                            st.error(f"Upload failed for {uploaded_file.name}: {str(e)}")
+                            continue
+                        except Exception as e:
+                            st.error(f"Unexpected error uploading {uploaded_file.name}: {str(e)}")
+                            continue
+
                     # Automatic status progression
                     if doc_type == "First Draft":
                         success, msg = database.update_activity_status(activity_id, 'Active', current_user['id'])

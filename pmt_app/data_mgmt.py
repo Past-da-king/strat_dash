@@ -89,7 +89,7 @@ def import_from_zip(uploaded_file):
                 db_data = zip_ref.read('database/pm_tool.db')
                 with open(database.SQLITE_DB_PATH, 'wb') as f:
                     f.write(db_data)
-            
+
             # 2. Restore Documents
             # Extract only files starting with 'documents/' to the uploads folder
             for member in zip_ref.namelist():
@@ -99,9 +99,9 @@ def import_from_zip(uploaded_file):
                     if filename: # Avoid directory members
                         # Ensure forward slashes for Azure Blob Storage
                         blob_name = f"uploads/{filename}".replace('\\', '/')
-                        # Upload byte content directly to Azure
-                        database.upload_file_to_azure(zip_ref.read(member), blob_name)
-                            
+                        # Upload byte content directly to Azure (skip validation for backup restoration)
+                        database.upload_file_to_azure(zip_ref.read(member), blob_name, validate=False)
+
         st.cache_data.clear()
         return True, "System fully restored from ZIP archive (DB and Documents)!"
     except Exception as e:

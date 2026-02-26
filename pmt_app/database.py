@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import os
 import re
+import security
 from azure.storage.blob import BlobServiceClient
 
 # --- DATABASE CONFIG ---
@@ -12,15 +13,74 @@ UPLOADS_DIR = None  # All file storage is now handled by Azure Blob Storage
 AZURE_CONNECTION = st.secrets["azure"]["connection_string"]
 AZURE_CONTAINER = st.secrets["azure"]["container_name"]
 
+# --- FILE UPLOAD SECURITY SETTINGS ---
+MAX_FILE_SIZE = security.MAX_FILE_SIZE  # 50 MB
+ALLOWED_EXTENSIONS = set(security.ALLOWED_FILE_TYPES.keys())
+
 def get_blob_client(blob_name):
     blob_service_client = BlobServiceClient.from_connection_string(AZURE_CONNECTION)
     return blob_service_client.get_blob_client(container=AZURE_CONTAINER, blob=blob_name)
 
-def upload_file_to_azure(file_bytes, blob_name):
-    """Uploads bytes to Azure Blob Storage."""
+def upload_file_to_azure(file_bytes, blob_name, validate=True):
+    """
+    Uploads bytes to Azure Blob Storage with security validation.
+    
+    Args:
+        file_bytes: File content in bytes
+        blob_name: Destination blob name
+        validate: Whether to perform security validation (default True)
+    
+    Returns:
+        blob_name if successful
+    
+    Raises:
+        ValueError: If file fails security validation
+    """
+    # Security validation
+    if validate:
+        # Check file size
+        if len(file_bytes) > MAX_FILE_SIZE:
+            raise ValueError(f"File too large. Maximum size is {MAX_FILE_SIZE // (1024*1024)}MB")
+        
+        # Validate blob name to prevent path traversal
+        if not _is_safe_blob_name(blob_name):
+            raise ValueError("Invalid file name or path")
+    
     blob_client = get_blob_client(blob_name)
     blob_client.upload_blob(file_bytes, overwrite=True)
     return blob_name
+
+
+def _is_safe_blob_name(blob_name: str) -> bool:
+    """
+    Validate blob name to prevent path traversal and injection attacks.
+    
+    Checks:
+    - No null bytes
+    - No path traversal sequences (..)
+    - Only allowed characters
+    - Reasonable length
+    """
+    if not blob_name:
+        return False
+    
+    # Check for null bytes
+    if '\x00' in blob_name:
+        return False
+    
+    # Check for path traversal
+    if '..' in blob_name:
+        return False
+    
+    # Check length (max 256 chars for Azure Blob)
+    if len(blob_name) > 256:
+        return False
+    
+    # Check for allowed characters (alphanumeric, /, -, _, .)
+    if not re.match(r'^[a-zA-Z0-9/\-_.]+$', blob_name):
+        return False
+    
+    return True
 
 def download_file_from_azure(blob_name):
     """Downloads blob content as bytes."""
@@ -109,7 +169,44 @@ init_repository_links_table()
 
 
 def execute_query(query, params=(), commit=False):
-    """Executes a query with automatic PostgreSQL-to-SQLite translation."""
+    """
+    Executes a query with automatic PostgreSQL-to-SQLite translation.
+    
+    SECURITY: All queries MUST use parameterized queries with %s placeholders.
+    Never use string formatting or concatenation with user input.
+    
+    Args:
+        query: SQL query with %s placeholders
+        params: Tuple of parameters to bind
+        commit: Whether to commit the transaction
+    
+    Returns:
+        Query results or last inserted ID
+    
+    Raises:
+        ValueError: If query contains potential SQL injection patterns
+    """
+    # Security: Block dangerous patterns ONLY in user input context
+    # We check for patterns that indicate SQL injection via string concatenation
+    # but allow legitimate SQL keywords in proper queries
+    
+    query_upper = query.upper()
+    
+    # Block SQL comment injection (used to bypass security)
+    if '--' in query and 'CREATE ' not in query_upper and 'INSERT ' not in query_upper:
+        raise ValueError("Potentially dangerous SQL comment detected")
+    
+    # Block multiple statement execution (stacked queries)
+    # Count semicolons - legitimate queries have 0 or 1 (for CREATE/INSERT)
+    if query.count(';') > 1:
+        raise ValueError("Multiple SQL statements detected")
+    
+    # Block dangerous extended stored procedures (SQL Server specific)
+    dangerous_patterns = ['XP_', 'SP_']
+    for pattern in dangerous_patterns:
+        if pattern in query_upper:
+            raise ValueError(f"Potentially dangerous SQL pattern detected: {pattern}")
+    
     # 1. Translate placeholders: %s -> ?
     query = query.replace("%s", "?")
 

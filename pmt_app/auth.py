@@ -10,6 +10,7 @@ from database import (
 )
 import secrets
 from datetime import datetime, timedelta
+import security
 
 def init_session():
     if "user" not in st.session_state:
@@ -24,9 +25,9 @@ def init_session():
         del st.query_params["token"]
 
     if not st.session_state.get("user"):
-        # Synchronously read the cookie natively from Streamlit
-        token = st.context.cookies.get("auth_token")
-        
+        # Use secure cookie retrieval with signature verification
+        token = security.get_secure_cookie("auth_token")
+
         if token:
             user = get_valid_session(token)
             if user:
@@ -40,12 +41,27 @@ def init_session():
                 }
                 st.session_state["role"] = user["role"]
             else:
-                # Token is invalid, flag for deletion on front-end
-                st.session_state["_del_cookie"] = True
+                # Token is invalid or tampered, flag for deletion
+                security.delete_secure_cookie("auth_token")
 
 def login(username, password):
+    """
+    Secure login with rate limiting and input validation.
+    """
+    # Validate input
+    is_valid, error_msg = security.validate_username(username)
+    if not is_valid:
+        return False
+    
+    # Rate limiting check
+    is_allowed, remaining = security.check_rate_limit(f"login_{username}")
+    if not is_allowed:
+        st.error(f"Too many login attempts. Please try again in {security.LOCKOUT_DURATION // 60} minutes.")
+        return False
+    
     user = get_user_by_username(username)
     if user and check_password_hash(user["password_hash"], password):
+        # Successful login - generate secure token
         token = secrets.token_urlsafe(32)
         expire_date = datetime.now() + timedelta(days=7)
         expires_at = expire_date.strftime("%Y-%m-%d %H:%M:%S")
@@ -60,13 +76,37 @@ def login(username, password):
             "token": token,
         }
         st.session_state["role"] = user["role"]
+
+        # Set secure cookie with proper flags
+        security.set_secure_cookie("auth_token", token)
         
-        # Flag token to be written in the main layout frame so it resolves
-        st.session_state["_set_cookie"] = token
+        # Reset rate limit on successful login
+        security.reset_rate_limit(f"login_{username}")
+        
         return True
-    return False
+    else:
+        # Record failed attempt
+        security.record_attempt(f"login_{username}")
+        return False
 
 def register(username, password, full_name, role="pm"):
+    """
+    Secure user registration with input validation.
+    """
+    # Validate username
+    is_valid, error_msg = security.validate_username(username)
+    if not is_valid:
+        return False, error_msg
+    
+    # Validate password strength
+    is_valid, error_msg = security.validate_password(password)
+    if not is_valid:
+        return False, error_msg
+    
+    # Validate full name
+    if not full_name or len(full_name.strip()) < 2:
+        return False, "Full name is required (minimum 2 characters)"
+    
     if get_user_by_username(username):
         return False, "Username already exists"
 
@@ -75,7 +115,7 @@ def register(username, password, full_name, role="pm"):
         {
             "username": username,
             "password_hash": password_hash,
-            "full_name": full_name,
+            "full_name": full_name.strip(),
             "role": role,
             "status": "pending",
         }
@@ -83,15 +123,18 @@ def register(username, password, full_name, role="pm"):
     return True, "User registered successfully. Access is pending Admin approval."
 
 def logout():
+    """Securely logout and clear all session data."""
     token = st.session_state.get("user", {}).get("token")
     if token:
         delete_session_token(token)
 
     st.session_state["user"] = None
     st.session_state["role"] = None
-    
-    st.session_state["_del_cookie"] = True
 
+    # Securely delete the cookie
+    security.delete_secure_cookie("auth_token")
+
+    # Clear any URL tokens
     if "token" in st.query_params:
         del st.query_params["token"]
 

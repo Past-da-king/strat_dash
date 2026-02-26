@@ -2,6 +2,7 @@ import streamlit as st
 import database
 import auth
 import styles
+import security
 import os
 import base64
 from pathlib import Path
@@ -141,18 +142,42 @@ def login_view():
                     '<div style="color: #38bdf8; font-size: 1.2rem; font-weight: 700; margin-bottom: 8px;">Welcome Back</div>',
                     unsafe_allow_html=True,
                 )
-                username = st.text_input("Username")
-                password = st.text_input("Password", type="password")
+                username = st.text_input("Username", key="login_username")
+                password = st.text_input("Password", type="password", key="login_password")
+
+                # Generate CSRF token (stored in session state, no visible field)
+                security.generate_csrf_token()
+
                 st.markdown('<div class="exec-btn">', unsafe_allow_html=True)
                 submit = st.form_submit_button("LOGIN", use_container_width=True)
                 st.markdown("</div>", unsafe_allow_html=True)
 
                 if submit:
+                    # Validate CSRF token
+                    if not security.validate_csrf_token():
+                        st.error("Security validation failed. Please try again.")
+                        st.stop()
+
+                    # Input validation
+                    is_valid, error_msg = security.validate_username(username)
+                    if not is_valid:
+                        st.error(error_msg)
+                        st.stop()
+
+                    if not password:
+                        st.error("Password is required")
+                        st.stop()
+
                     if auth.login(username, password):
                         st.success("Login successful! Redirecting...")
                         st.rerun()
                     else:
-                        st.error("Invalid username or password.")
+                        # Check if account is locked
+                        is_allowed, remaining = security.check_rate_limit(f"login_{username}")
+                        if not is_allowed:
+                            st.error(f"Account temporarily locked. Try again in {security.LOCKOUT_DURATION // 60} minutes.")
+                        else:
+                            st.error(f"Invalid username or password. ({remaining} attempts remaining)")
 
         with tab_signup:
             with st.form("signup_form"):
@@ -160,10 +185,10 @@ def login_view():
                 st.info(
                     "Your account will require administrator approval before you can log in."
                 )
-                new_user = st.text_input("Username *")
-                new_pass = st.text_input("Password *", type="password")
-                new_name = st.text_input("Full Name *")
-                new_role = st.selectbox("Requested Role", ["pm", "executive", "team"])
+                new_user = st.text_input("Username *", key="signup_username")
+                new_pass = st.text_input("Password *", type="password", key="signup_password")
+                new_name = st.text_input("Full Name *", key="signup_name")
+                new_role = st.selectbox("Requested Role", ["pm", "executive", "team"], key="signup_role")
 
                 st.markdown('<div class="add-btn">', unsafe_allow_html=True)
                 signup_submit = st.form_submit_button(
@@ -172,9 +197,22 @@ def login_view():
                 st.markdown("</div>", unsafe_allow_html=True)
 
                 if signup_submit:
-                    if not new_user or not new_pass or not new_name:
-                        st.error("All fields are required.")
-                    elif database.get_user_by_username(new_user):
+                    # Validate inputs
+                    is_valid, error_msg = security.validate_username(new_user)
+                    if not is_valid:
+                        st.error(error_msg)
+                        st.stop()
+                    
+                    is_valid, error_msg = security.validate_password(new_pass)
+                    if not is_valid:
+                        st.error(error_msg)
+                        st.stop()
+                    
+                    if not new_name or len(new_name.strip()) < 2:
+                        st.error("Full name must be at least 2 characters")
+                        st.stop()
+                    
+                    if database.get_user_by_username(new_user):
                         st.error("Username already exists.")
                     else:
                         from werkzeug.security import generate_password_hash
@@ -184,7 +222,7 @@ def login_view():
                                 {
                                     "username": new_user,
                                     "password_hash": generate_password_hash(new_pass),
-                                    "full_name": new_name,
+                                    "full_name": new_name.strip(),
                                     "role": new_role,
                                     "status": "pending",
                                 }
@@ -209,12 +247,31 @@ def main():
     auth.init_session()
 
     import streamlit.components.v1 as components
+    
+    # Handle secure cookie setting with proper flags
     if "_set_cookie" in st.session_state:
-        token = st.session_state["_set_cookie"]
-        components.html(f'<script>document.cookie = "auth_token={token}; max-age=604800; path=/; samesite=strict";</script>', height=0)
+        cookie_data = st.session_state["_set_cookie"]
+        if isinstance(cookie_data, dict):
+            # New secure cookie format
+            cookie_string = f"{cookie_data['name']}={cookie_data['value']}; Max-Age={cookie_data['max_age']}; Path=/; SameSite={cookie_data['samesite']}"
+            if cookie_data.get('secure'):
+                cookie_string += "; Secure"
+        else:
+            # Legacy format (backward compatibility)
+            cookie_string = f"auth_token={cookie_data}; max-age=604800; path=/; samesite=lax"
+        
+        components.html(f'<script>document.cookie = "{cookie_string}";</script>', height=0)
         del st.session_state["_set_cookie"]
     elif "_del_cookie" in st.session_state:
-        components.html('<script>document.cookie = "auth_token=; max-age=0; path=/; samesite=strict";</script>', height=0)
+        cookie_data = st.session_state["_del_cookie"]
+        if isinstance(cookie_data, dict):
+            # New secure cookie format
+            cookie_string = f"{cookie_data['name']}=; Max-Age=0; Path=/; SameSite=Lax"
+        else:
+            # Legacy format
+            cookie_string = "auth_token=; max-age=0; path=/; samesite=lax"
+        
+        components.html(f'<script>document.cookie = "{cookie_string}";</script>', height=0)
         del st.session_state["_del_cookie"]
 
     if not auth.is_logged_in():

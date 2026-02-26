@@ -2,6 +2,7 @@ import psycopg2
 import os
 import streamlit as st
 from werkzeug.security import generate_password_hash
+import secrets
 
 UPLOADS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'uploads')
 
@@ -11,6 +12,35 @@ def get_neon_url():
         return st.secrets["database"]["url"]
     except Exception:
         return os.environ.get("DATABASE_URL")
+
+
+def get_seed_password(username: str) -> str:
+    """
+    Get seed password from environment variable or generate secure random one.
+    
+    Environment variables checked:
+    - SEED_ADMIN_PASSWORD
+    - SEED_PM_PASSWORD
+    - SEED_EXEC_PASSWORD
+    - SEED_TEAM_PASSWORD
+    
+    If not set, generates a secure random password and prints it to console.
+    """
+    env_mapping = {
+        'admin': 'SEED_ADMIN_PASSWORD',
+        'pm_user': 'SEED_PM_PASSWORD',
+        'exec_user': 'SEED_EXEC_PASSWORD',
+        'team_user': 'SEED_TEAM_PASSWORD'
+    }
+    
+    env_var = env_mapping.get(username)
+    if env_var:
+        password = os.environ.get(env_var)
+        if password:
+            return password
+    
+    # Generate secure random password if not set
+    return secrets.token_urlsafe(12)
 
 def init_db():
     db_url = get_neon_url()
@@ -189,44 +219,54 @@ def init_db():
     # Seed Admin User (only if not already present)
     cursor.execute("SELECT 1 FROM users WHERE username = 'admin'")
     if not cursor.fetchone():
-        admin_pw = generate_password_hash('admin123')
+        admin_pw = get_seed_password('admin')
         cursor.execute('''
         INSERT INTO users (username, password_hash, role, full_name)
         VALUES (%s, %s, %s, %s)
-        ''', ('admin', admin_pw, 'admin', 'System Administrator'))
+        ''', ('admin', generate_password_hash(admin_pw), 'admin', 'System Administrator'))
+        print(f"⚠️  SEED ADMIN PASSWORD: {admin_pw}")
+        print("⚠️  (Set SEED_ADMIN_PASSWORD environment variable to use a custom password)")
 
     # Seed PM user
     cursor.execute("SELECT 1 FROM users WHERE username = 'pm_user'")
     if not cursor.fetchone():
-        pm_pw = generate_password_hash('pm123')
+        pm_pw = get_seed_password('pm_user')
         cursor.execute('''
         INSERT INTO users (username, password_hash, role, full_name)
         VALUES (%s, %s, %s, %s)
-        ''', ('pm_user', pm_pw, 'pm', 'John Project Manager'))
+        ''', ('pm_user', generate_password_hash(pm_pw), 'pm', 'John Project Manager'))
+        print(f"⚠️  SEED PM PASSWORD: {pm_pw}")
+        print("⚠️  (Set SEED_PM_PASSWORD environment variable to use a custom password)")
 
     # Seed Executive user
     cursor.execute("SELECT 1 FROM users WHERE username = 'exec_user'")
     if not cursor.fetchone():
-        exec_pw = generate_password_hash('exec123')
+        exec_pw = get_seed_password('exec_user')
         cursor.execute('''
         INSERT INTO users (username, password_hash, role, full_name)
         VALUES (%s, %s, %s, %s)
-        ''', ('exec_user', exec_pw, 'executive', 'Jane Executive'))
+        ''', ('exec_user', generate_password_hash(exec_pw), 'executive', 'Jane Executive'))
+        print(f"⚠️  SEED EXECUTIVE PASSWORD: {exec_pw}")
+        print("⚠️  (Set SEED_EXEC_PASSWORD environment variable to use a custom password)")
 
     # Seed Team user
     cursor.execute("SELECT 1 FROM users WHERE username = 'team_user'")
     if not cursor.fetchone():
-        rec_pw = generate_password_hash('team123')
+        team_pw = get_seed_password('team_user')
         cursor.execute('''
         INSERT INTO users (username, password_hash, role, full_name)
         VALUES (%s, %s, %s, %s)
-        ''', ('team_user', rec_pw, 'team', 'Bob Team Member'))
+        ''', ('team_user', generate_password_hash(team_pw), 'team', 'Bob Team Member'))
+        print(f"⚠️  SEED TEAM PASSWORD: {team_pw}")
+        print("⚠️  (Set SEED_TEAM_PASSWORD environment variable to use a custom password)")
 
     conn.commit()
     conn.close()
     print("Neon PostgreSQL database initialized successfully!")
     print("Tables created: users, projects, baseline_schedule, activity_log, expenditure_log, project_assignments, audit_log, risks, task_outputs")
     print("Seed users: admin, pm_user, exec_user, team_user")
+    print("\n⚠️  IMPORTANT: Change all seed passwords in production!")
+    print("⚠️  Store passwords in environment variables or a secure vault.\n")
 
 if __name__ == '__main__':
     init_db()

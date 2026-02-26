@@ -4,6 +4,8 @@ import database
 import pandas as pd
 import base64
 import styles
+import security
+from io import BytesIO
 
 # Page Config
 st.set_page_config(page_title="PM Tool - Project Repository", layout="wide")
@@ -45,7 +47,7 @@ def project_repository_page():
             line-height: 1.0 !important;
         }
         [data-testid="stVerticalBlock"] { gap: 0 !important; }
-        
+
         .repo-table-row [data-testid="column"] {
             display: flex !important;
             align-items: center !important;
@@ -53,7 +55,7 @@ def project_repository_page():
         }
 
         /* NUCLEAR RESET for buttons */
-        [data-testid="stButton"] button, 
+        [data-testid="stButton"] button,
         [data-testid="stPopover"] button {
             border: none !important;
             background: transparent !important;
@@ -76,7 +78,7 @@ def project_repository_page():
         }
 
         /* KILL ALL ARROWS and SVG artifacts */
-        [data-testid="stPopover"] svg, 
+        [data-testid="stPopover"] svg,
         [data-testid="stIconChevronDown"] {
             display: none !important;
             width: 0 !important;
@@ -84,7 +86,7 @@ def project_repository_page():
             visibility: hidden !important;
             position: absolute !important;
         }
-        
+
         /* Folder Links: Plain URLs */
         .folder-link-row [data-testid="stButton"] button {
             color: #0ea5e9 !important;
@@ -114,11 +116,8 @@ def project_repository_page():
     st.divider()
 
     # --- CORE REPO TABS ---
-    # Removed Query Param-based Action Handlers to prevent Streamlit Cloud Logouts
-    # --- CORE REPO TABS ---
-    # Clean text-based tabs as requested
     tab_repo, tab_act, tab_risk = st.tabs(["Global Repository", "Activity Outputs", "Risk Closure Proofs"])
-    
+
     # Custom CSS for UI refinements
     st.markdown("""<style>
         .stTabs [data-baseweb="tab-list"] button [data-testid="stMarkdownContainer"] p {
@@ -140,11 +139,6 @@ def project_repository_page():
         if ext in ['pptx', 'ppt']: return '<i class="fas fa-file-powerpoint" style="color: #ea580c;"></i>'
         return '<i class="fas fa-file-alt" style="color: #94a3b8;"></i>'
 
-    def make_download_link(data_bytes, filename, label="Download"):
-        """Generate a plain HTML <a> download link from raw bytes. No button."""
-        b64 = base64.b64encode(data_bytes).decode()
-        return f'<a href="data:application/octet-stream;base64,{b64}" download="{filename}">{label}</a>'
-
     def render_linked_context(item_type, item_id):
         """Render automated and manual links as a knowledge graph context."""
         # 1. Manual Links
@@ -156,10 +150,10 @@ def project_repository_page():
                     other_type, other_id = l['target_type'], l['target_id']
                 else:
                     other_type, other_id = l['source_type'], l['source_id']
-                
+
                 type_map = {'R': 'Repo', 'A': 'Activity', 'K': 'Risk'}
                 st.caption(f"↳ {type_map.get(other_type)} #{other_id}")
-        
+
         # 2. Create Link UI
         with st.expander("Link to another document..."):
             target_type = st.selectbox("Type", ["R", "A", "K"], key=f"lt_{item_type}_{item_id}")
@@ -174,7 +168,7 @@ def project_repository_page():
     with tab_repo:
         nav_key = f"repo_nav_{project_id}"
         if nav_key not in st.session_state: st.session_state[nav_key] = [{'id': None, 'name': 'ROOT'}]
-        
+
         current_nav = st.session_state[nav_key]
         current_folder = current_nav[-1]['id']
 
@@ -187,7 +181,7 @@ def project_repository_page():
                 bc_links.append(f"<span style='color:#0ea5e9;'>{n['name']}</span>")
             bc_str = " <span style='color:#475569;'>/</span> ".join(bc_links)
             st.markdown(f'<div style="display:flex; align-items:center; gap:8px; font-size:0.95rem; margin-bottom:15px; color:#64748b;">{bc_str}</div>', unsafe_allow_html=True)
-        
+
         with head_col2:
             # Minimalist Action Bar
             h_c1, h_c2 = st.columns(2)
@@ -201,22 +195,55 @@ def project_repository_page():
                     st.markdown("##### New...")
                     s_t1, s_t2 = st.tabs(["Folder", "File"])
                     with s_t1:
-                        f_name = st.text_input("Name", key="f_n_input")
-                        if st.button("Create", use_container_width=True):
+                        f_name = st.text_input("Name", key=f"f_n_input_{project_id}_{current_folder}")
+                        if st.button("Create", use_container_width=True, key=f"btn_create_folder_{project_id}_{current_folder}"):
                             database.create_repo_folder(project_id, f_name, current_folder, current_user['id'])
                             st.rerun()
                     with s_t2:
-                        files = st.file_uploader("Select", accept_multiple_files=True, type=['pdf', 'docx', 'doc', 'xlsx', 'xls', 'pptx', 'ppt', 'png', 'jpg', 'jpeg', 'csv', 'zip'], key="f_u_input")
-                        if files and st.button("Upload", use_container_width=True):
+                        files = st.file_uploader(
+                            "Select",
+                            accept_multiple_files=True,
+                            type=['pdf', 'docx', 'doc', 'xlsx', 'xls', 'pptx', 'ppt', 'png', 'jpg', 'jpeg', 'csv', 'zip'],
+                            key=f"f_u_input_{project_id}_{current_folder}",
+                            help="Maximum file size: 100MB per file"
+                        )
+                        if files and st.button("Upload", use_container_width=True, key=f"btn_upload_files_{project_id}_{current_folder}"):
+                            upload_errors = []
+                            success_count = 0
                             for f in files:
-                                blob = f"uploads/projects/{project_id}/repo/{f.name}"
-                                database.upload_file_to_azure(f.getvalue(), blob)
-                                database.add_repo_file(project_id, current_folder, f.name, blob, current_user['id'])
+                                try:
+                                    # Validate file size (100MB limit)
+                                    if f.size > 100 * 1024 * 1024:
+                                        upload_errors.append(f"{f.name}: File too large (max 100MB)")
+                                        continue
+                                    
+                                    # Validate file type
+                                    is_valid, error_msg = security.validate_file_upload(f)
+                                    if not is_valid:
+                                        upload_errors.append(f"{f.name}: {error_msg}")
+                                        continue
+                                    
+                                    # Sanitize filename
+                                    safe_filename = security.sanitize_html(f.name)
+                                    blob = f"uploads/projects/{project_id}/repo/{safe_filename}"
+                                    
+                                    # Upload to Azure
+                                    database.upload_file_to_azure(f.getvalue(), blob, validate=True)
+                                    database.add_repo_file(project_id, current_folder, safe_filename, blob, current_user['id'])
+                                    success_count += 1
+                                except Exception as e:
+                                    upload_errors.append(f"{f.name}: {str(e)}")
+                            
+                            if success_count > 0:
+                                st.success(f"✅ Uploaded {success_count} file(s)")
+                            if upload_errors:
+                                for err in upload_errors:
+                                    st.error(err)
+                            
                             st.rerun()
 
         st.divider()
-        
-        # --- FILE LISTING ---
+
         # --- FILE LISTING HEADERS ---
         h1, h2, h3, h4, h5 = st.columns([0.4, 5.1, 2, 2, 0.5])
         with h2: st.markdown("<span style='font-size:0.8rem; font-weight:700; color:#475569;'>Name</span>", unsafe_allow_html=True)
@@ -233,11 +260,11 @@ def project_repository_page():
                 st.markdown('<div class="repo-table-row">', unsafe_allow_html=True)
                 with st.container():
                     r1, r2, r3, r4, r5 = st.columns([0.4, 5.1, 2, 2, 0.5])
-                    
+
                     # 1. Icon
-                    with r1: 
+                    with r1:
                         st.markdown(get_icon(item["name"], item["is_folder"]), unsafe_allow_html=True)
-                    
+
                     # 2. Name
                     with r2:
                         if item['is_folder']:
@@ -248,33 +275,64 @@ def project_repository_page():
                             st.markdown('</div>', unsafe_allow_html=True)
                         else:
                             st.markdown(f'<div style="font-weight:400; font-size:1.0rem;">{item["name"]}</div>', unsafe_allow_html=True)
-                    
+
                     # 3. Date
                     with r3:
                         st.markdown(f'<div style="font-size:0.85rem; color:#64748b;">{str(item["created_at"])[:10]}</div>', unsafe_allow_html=True)
-                    
+
                     # 4. Uploader
                     with r4:
                         st.markdown(f'<div style="font-size:0.85rem; color:#64748b;">{item["uploader_name"]}</div>', unsafe_allow_html=True)
-                    
-                    # 5. Options (Three Dots)
+
+                    # 5. Options (Three Dots) - FIXED: Only download file when user clicks download button
                     with r5:
                         with st.popover("⋮", icon=None, help="Actions"):
                             if not item['is_folder']:
-                                try:
-                                    data = database.download_file_from_azure(item['file_path'])
-                                    st.markdown(make_download_link(data, item['name'], "Download Permanent"), unsafe_allow_html=True)
-                                except: st.caption("File missing")
-                            
-                            # Delete Action (Styled proper button)
+                                # Download button - ONLY loads file when clicked (lazy loading)
+                                st.markdown('<div class="download-btn">', unsafe_allow_html=True)
+                                if st.button("⬇️ Download", key=f"dl_btn_{item['file_id']}", use_container_width=True):
+                                    # Store which file to download in session state
+                                    st.session_state[f"download_file_{item['file_id']}"] = True
+                                
+                                # Handle download separately (outside popover)
+                                if st.session_state.get(f"download_file_{item['file_id']}"):
+                                    try:
+                                        with st.spinner(f"Downloading {item['name']}..."):
+                                            data = database.download_file_from_azure(item['file_path'])
+                                            st.download_button(
+                                                label="📥 Click to Save",
+                                                data=data,
+                                                file_name=item['name'],
+                                                mime="application/octet-stream",
+                                                key=f"actual_dl_{item['file_id']}",
+                                                use_container_width=True
+                                            )
+                                    except Exception as e:
+                                        st.error(f"Download failed: {str(e)}")
+                                    finally:
+                                        del st.session_state[f"download_file_{item['file_id']}"]
+                                st.markdown('</div>', unsafe_allow_html=True)
+
+                            # Delete Action
                             st.markdown('<div class="danger-btn">', unsafe_allow_html=True)
-                            if st.button("Delete Permanent", key=f"del_repo_{item['file_id']}", use_container_width=True):
+                            if st.button("🗑️ Delete", key=f"del_repo_{item['file_id']}", use_container_width=True):
                                 database.delete_repo_item(item['file_id'])
                                 st.rerun()
                             st.markdown('</div>', unsafe_allow_html=True)
+                            
+                            # Show file size info
+                            try:
+                                # Get blob info without downloading
+                                blob_client = database.get_blob_client(item['file_path'])
+                                props = blob_client.get_blob_properties()
+                                size_mb = props.size / (1024 * 1024)
+                                st.caption(f"📦 {size_mb:.1f} MB")
+                            except:
+                                st.caption("Size unknown")
+                            
                             render_linked_context('R', item['file_id'])
                 st.markdown('</div>', unsafe_allow_html=True)
-                
+
                 # Invisible row separator
                 st.markdown('<div style="height:1px; background:rgba(128,128,128,0.05); width:100%; margin:2px 0;"></div>', unsafe_allow_html=True)
 
@@ -288,7 +346,7 @@ def project_repository_page():
             for _, act in activities.iterrows():
                 outputs = database.get_task_outputs(act['activity_id'])
                 if outputs.empty: continue
-                
+
                 with st.expander(f"Task: {act['activity_name']}", expanded=True):
                     for _, out in outputs.iterrows():
                         ar1, ar2, ar3 = st.columns([0.4, 8.6, 1])
@@ -298,17 +356,46 @@ def project_repository_page():
                             st.caption(f"Uploaded by {out['uploader_name']} on {str(out['uploaded_at'])[:10]}")
                         with ar3:
                             with st.popover("⋮", icon=None, help="Options", use_container_width=True):
-                                try:
-                                    data = database.download_file_from_azure(out['file_path'])
-                                    st.markdown(make_download_link(data, out['file_name'], "Download Permanent"), unsafe_allow_html=True)
-                                except: st.caption("File missing")
+                                # Download button - LAZY LOADING
+                                st.markdown('<div class="download-btn">', unsafe_allow_html=True)
+                                if st.button("⬇️ Download", key=f"dl_btn_act_{out['output_id']}", use_container_width=True):
+                                    st.session_state[f"download_file_act_{out['output_id']}"] = True
                                 
-                                # Delete Action (Styled proper button)
+                                # Handle download only when requested
+                                if st.session_state.get(f"download_file_act_{out['output_id']}"):
+                                    try:
+                                        with st.spinner(f"Downloading {out['file_name']}..."):
+                                            data = database.download_file_from_azure(out['file_path'])
+                                            st.download_button(
+                                                label="📥 Click to Save",
+                                                data=data,
+                                                file_name=out['file_name'],
+                                                mime="application/octet-stream",
+                                                key=f"actual_dl_act_{out['output_id']}",
+                                                use_container_width=True
+                                            )
+                                    except Exception as e:
+                                        st.error(f"Download failed: {str(e)}")
+                                    finally:
+                                        del st.session_state[f"download_file_act_{out['output_id']}"]
+                                st.markdown('</div>', unsafe_allow_html=True)
+
+                                # Delete Action
                                 st.markdown('<div class="danger-btn">', unsafe_allow_html=True)
-                                if st.button("Delete Permanent", key=f"del_act_{out['output_id']}", use_container_width=True):
+                                if st.button("🗑️ Delete", key=f"del_act_{out['output_id']}", use_container_width=True):
                                     database.delete_task_output(out['output_id'])
                                     st.rerun()
                                 st.markdown('</div>', unsafe_allow_html=True)
+                                
+                                # Show file size
+                                try:
+                                    blob_client = database.get_blob_client(out['file_path'])
+                                    props = blob_client.get_blob_properties()
+                                    size_mb = props.size / (1024 * 1024)
+                                    st.caption(f"📦 {size_mb:.1f} MB")
+                                except:
+                                    st.caption("Size unknown")
+                                
                                 render_linked_context('A', out['output_id'])
 
     # =========================================================================
@@ -317,7 +404,7 @@ def project_repository_page():
     with tab_risk:
         risks = database.get_project_risks(project_id)
         proofed_risks = risks[risks['closure_file_path'].notnull()]
-        
+
         if proofed_risks.empty: st.info("No risk closure files uploaded yet.")
         else:
             for _, r in proofed_risks.iterrows():
@@ -335,17 +422,46 @@ def project_repository_page():
                                 st.markdown(f'<div style="font-size: 0.7rem; color: #38bdf8;"><i class="fas fa-link"></i> Task: {r["activity_name"]}</div>', unsafe_allow_html=True)
                         with kr3:
                             with st.popover("⋮", icon=None, help="Options", use_container_width=True):
-                                try:
-                                    data = database.download_file_from_azure(p)
-                                    st.markdown(make_download_link(data, fname, "Download Permanent"), unsafe_allow_html=True)
-                                except: st.caption("File missing")
+                                # Download button - LAZY LOADING
+                                st.markdown('<div class="download-btn">', unsafe_allow_html=True)
+                                if st.button("⬇️ Download", key=f"dl_btn_risk_{r['risk_id']}_{hash(p)}", use_container_width=True):
+                                    st.session_state[f"download_file_risk_{r['risk_id']}_{hash(p)}"] = True
                                 
-                                # Delete Action (Styled proper button)
+                                # Handle download only when requested
+                                if st.session_state.get(f"download_file_risk_{r['risk_id']}_{hash(p)}"):
+                                    try:
+                                        with st.spinner(f"Downloading {fname}..."):
+                                            data = database.download_file_from_azure(p)
+                                            st.download_button(
+                                                label="📥 Click to Save",
+                                                data=data,
+                                                file_name=fname,
+                                                mime="application/octet-stream",
+                                                key=f"actual_dl_risk_{r['risk_id']}_{hash(p)}",
+                                                use_container_width=True
+                                            )
+                                    except Exception as e:
+                                        st.error(f"Download failed: {str(e)}")
+                                    finally:
+                                        del st.session_state[f"download_file_risk_{r['risk_id']}_{hash(p)}"]
+                                st.markdown('</div>', unsafe_allow_html=True)
+
+                                # Delete Action
                                 st.markdown('<div class="danger-btn">', unsafe_allow_html=True)
-                                if st.button("Delete Permanent", key=f"del_risk_{r['risk_id']}_{hash(p)}", use_container_width=True):
+                                if st.button("🗑️ Delete", key=f"del_risk_{r['risk_id']}_{hash(p)}", use_container_width=True):
                                     database.remove_risk_closure_file(r['risk_id'], p)
                                     st.rerun()
                                 st.markdown('</div>', unsafe_allow_html=True)
+                                
+                                # Show file size
+                                try:
+                                    blob_client = database.get_blob_client(p)
+                                    props = blob_client.get_blob_properties()
+                                    size_mb = props.size / (1024 * 1024)
+                                    st.caption(f"📦 {size_mb:.1f} MB")
+                                except:
+                                    st.caption("Size unknown")
+                                
                                 render_linked_context('K', r['risk_id'])
 
 
