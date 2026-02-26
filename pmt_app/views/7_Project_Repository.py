@@ -125,41 +125,6 @@ def project_repository_page():
             display: flex; align-items: center; gap: 8px; font-weight: 600;
         }
 
-        /* THE ULTIMATE NUCLEAR RESET: Force everything in Repository Action popovers to be plain text links */
-        div.stApp div[data-testid="stPopoverContent"] {
-            padding: 8px !important;
-        }
-        
-        /* Make Streamlit buttons inside popovers look like plain text links */
-        div.stApp div[data-testid="stPopoverContent"] button {
-            display: block !important;
-            padding: 4px 0 !important;
-            color: #38bdf8 !important;
-            text-decoration: none !important;
-            font-size: 0.95rem !important;
-            background: none !important;
-            border: none !important;
-            box-shadow: none !important;
-            text-align: left !important;
-            justify-content: flex-start !important;
-            width: 100% !important;
-            min-height: unset !important;
-        }
-        
-        div.stApp div[data-testid="stPopoverContent"] button:hover {
-            text-decoration: underline !important;
-            color: #7dd3fc !important;
-            background: none !important;
-        }
-        
-        /* Delete Text Style */
-        div.stApp div[data-testid="stPopoverContent"] button[key*="del_"] {
-            color: #f87171 !important;
-        }
-        div.stApp div[data-testid="stPopoverContent"] button[key*="del_"]:hover {
-            color: #ef4444 !important;
-        }
-
         .conn-header { font-size: 0.7rem; font-weight: 700; color: #475569; margin: 12px 0 4px 0; letter-spacing: 0.05em; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 8px; }
     </style>""", unsafe_allow_html=True)
 
@@ -300,10 +265,12 @@ def project_repository_page():
                                     st.markdown(make_download_link(data, item['name'], "Download Permanent"), unsafe_allow_html=True)
                                 except: st.caption("File missing")
                             
-                            # Delete Action (In-place button styled as text link)
+                            # Delete Action (In-place button styled as plain text)
+                            st.markdown('<div class="delete-text-link-wrapper">', unsafe_allow_html=True)
                             if st.button("Delete Permanent", key=f"del_repo_{item['file_id']}"):
                                 database.delete_repo_item(item['file_id'])
                                 st.rerun()
+                            st.markdown('</div>', unsafe_allow_html=True)
                             render_linked_context('R', item['file_id'])
                 st.markdown('</div>', unsafe_allow_html=True)
                 
@@ -335,7 +302,7 @@ def project_repository_page():
                                     st.markdown(make_download_link(data, out['file_name'], "Download Permanent"), unsafe_allow_html=True)
                                 except: st.caption("File missing")
                                 
-                                # Delete Action (In-place button styled as text link)
+                                # Delete Action (In-place button styled as plain text)
                                 if st.button("Delete Permanent", key=f"del_act_{out['output_id']}"):
                                     database.delete_task_output(out['output_id'])
                                     st.rerun()
@@ -370,7 +337,7 @@ def project_repository_page():
                                     st.markdown(make_download_link(data, fname, "Download Permanent"), unsafe_allow_html=True)
                                 except: st.caption("File missing")
                                 
-                                # Delete Action (In-place button styled as text link)
+                                # Delete Action (In-place button styled as plain text)
                                 if st.button("Delete Permanent", key=f"del_risk_{r['risk_id']}_{hash(p)}"):
                                     database.remove_risk_closure_file(r['risk_id'], p)
                                     st.rerun()

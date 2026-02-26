@@ -73,13 +73,12 @@ def global_css():
         }}
 
         /* --- Button Styling --- */
-        /* Universal Nuclear Reset for Popovers (Portal Level) */
-        [data-testid="stPopoverContent"],
+        /* NUCLEAR RESET: Force buttons inside popovers to be text-only */
         [data-testid="stPopoverContent"] button,
+        [data-testid="stPopoverContent"] [data-testid^="baseButton"],
         [data-testid="stPopoverContent"] div,
         [data-testid="stPopoverContent"] a,
-        [data-testid="stPopoverContent"] summary,
-        [data-testid="stPopoverContent"] [data-testid^="baseButton"] {{
+        [data-testid="stPopoverContent"] summary {{
             background: transparent !important;
             background-color: transparent !important;
             background-image: none !important;
@@ -87,44 +86,46 @@ def global_css():
             box-shadow: none !important;
             outline: none !important;
             border-radius: 0 !important;
-            transition: none !important;
             min-height: unset !important;
             height: auto !important;
             width: auto !important;
-            box-sizing: border-box !important;
-        }}
-
-        /* Plain Text Link Styling */
-        [data-testid="stPopoverContent"] a, 
-        [data-testid="stPopoverContent"] button, 
-        [data-testid="stPopoverContent"] summary {{
-            display: block !important;
-            padding: 6px 0 !important;
+            padding: 4px 0 !important;
             color: #38bdf8 !important;
-            font-size: 0.95rem !important;
-            font-weight: 400 !important;
-            text-decoration: none !important;
             text-align: left !important;
             justify-content: flex-start !important;
+            text-decoration: none !important;
         }}
 
-        /* Hover Feedback: Just Underline */
-        [data-testid="stPopoverContent"] a:hover, 
-        [data-testid="stPopoverContent"] button:hover, 
-        [data-testid="stPopoverContent"] summary:hover {{
+        [data-testid="stPopoverContent"] button p,
+        [data-testid="stPopoverContent"] button div {{
+            margin: 0 !important;
+            padding: 0 !important;
+            color: inherit !important;
+            font-size: 0.95rem !important;
+            font-weight: 500 !important;
+        }}
+
+        /* Hover Feedback */
+        [data-testid="stPopoverContent"] button:hover,
+        [data-testid="stPopoverContent"] button:hover p,
+        [data-testid="stPopoverContent"] a:hover {{
             text-decoration: underline !important;
             color: #7dd3fc !important;
             background: transparent !important;
         }}
 
-        /* Red Delete Link */
-        [data-testid="stPopoverContent"] .del-link,
+        /* Red Delete Link Specificity */
+        [data-testid="stPopoverContent"] button:has(p:contains("Delete")),
         [data-testid="stPopoverContent"] button:has(div:contains("Delete")),
-        [data-testid="stPopoverContent"] button:has(p:contains("Delete")) {{
+        [data-testid="stPopoverContent"] button:has(p:contains("Permanent")) {{
+            color: #f87171 !important;
+        }}
+        [data-testid="stPopoverContent"] button:has(p:contains("Delete")) p,
+        [data-testid="stPopoverContent"] button:has(p:contains("Permanent")) p {{
             color: #f87171 !important;
         }}
 
-        /* Wipe out expander box look */
+        /* Wipe out expander box look inside popovers */
         [data-testid="stPopoverContent"] [data-testid="stExpander"] {{
             border: none !important;
             background: transparent !important;
