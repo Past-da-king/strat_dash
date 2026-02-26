@@ -302,9 +302,23 @@ def pm_dashboard():
     @st.dialog("Milestones Tracker", width="large")
     def show_full_milestones(milestones_df):
         st.markdown("### Project Phases & Milestones")
-        display_cols = ['activity_name', 'planned_start', 'planned_finish', 'status', 'responsible_name', 'expected_output']
+        # Added 'dependency_name' to show activity dependencies
+        display_cols = ['activity_name', 'dependency_name', 'planned_start', 'planned_finish', 'status', 'responsible_name', 'expected_output']
+        
+        rename_map = {
+            'activity_name': 'Activity',
+            'dependency_name': 'Activity Dependencies',
+            'planned_start': 'Start Date',
+            'planned_finish': 'Finish Date',
+            'status': 'Status',
+            'responsible_name': 'Responsible',
+            'expected_output': 'Expected Output'
+        }
+        
         available_cols = [c for c in display_cols if c in milestones_df.columns]
-        st.dataframe(milestones_df[available_cols], use_container_width=True, hide_index=True)
+        df_display = milestones_df[available_cols].rename(columns=rename_map)
+        
+        st.dataframe(df_display, use_container_width=True, hide_index=True)
 
     @st.dialog("Full Risk Register", width="large")
     def show_full_risks(project_id):
@@ -415,6 +429,7 @@ def pm_dashboard():
     all_activities = database.get_df('''
         SELECT bs.*, 
                u.full_name as responsible_name,
+               dep.activity_name as dependency_name,
                (CASE WHEN bs.status = 'Complete' THEN 'Complete' 
                      WHEN bs.status = 'Active' THEN 'Active' 
                      ELSE 'Not Started' END) as status_mapped,
@@ -422,6 +437,7 @@ def pm_dashboard():
                (CASE WHEN bs.status IN ('Active', 'Complete') THEN 1 ELSE 0 END) as is_started
         FROM baseline_schedule bs
         LEFT JOIN users u ON bs.responsible_user_id = u.user_id
+        LEFT JOIN baseline_schedule dep ON bs.depends_on = dep.activity_id
         WHERE bs.project_id = %s ORDER BY bs.planned_start
     ''', (project_id,))
 
