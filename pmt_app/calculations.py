@@ -346,3 +346,96 @@ def get_burndown_data(project_id):
     except Exception as e:
         logger.error(f"Error building burndown data for project {project_id}: {e}")
         return None
+
+def get_network_diagram_data(project_id):
+    """
+    Calculates the Critical Path and dependency metrics for the network diagram.
+    Uses the Baseline Schedule dates to derive durations and dependencies.
+    """
+    try:
+        activities_df = database.get_df('''
+            SELECT bs.activity_id, bs.activity_name, bs.planned_start, bs.planned_finish, 
+                   bs.depends_on, bs.status, u.full_name as responsible_name
+            FROM baseline_schedule bs
+            LEFT JOIN users u ON bs.responsible_user_id = u.user_id
+            WHERE bs.project_id = %s
+        ''', (project_id,))
+
+        if activities_df.empty:
+            return None
+
+        # Prepare data structures
+        activities = activities_df.to_dict('records')
+        nodes = {a['activity_id']: a for a in activities}
+        
+        # Calculate durations
+        for aid in nodes:
+            start = pd.to_datetime(nodes[aid]['planned_start'])
+            finish = pd.to_datetime(nodes[aid]['planned_finish'])
+            nodes[aid]['duration'] = max((finish - start).days, 1)
+            nodes[aid]['successors'] = []
+            nodes[aid]['predecessors'] = [nodes[aid]['depends_on']] if nodes[aid]['depends_on'] else []
+
+        # Map successors
+        for aid in nodes:
+            dep = nodes[aid]['depends_on']
+            if dep in nodes:
+                nodes[dep]['successors'].append(aid)
+
+        # 1. Forward Pass (ES, EF)
+        def forward_pass():
+            visited = set()
+            def visit(aid):
+                if aid in visited: return
+                nodes[aid]['es'] = 0
+                for pred_id in nodes[aid]['predecessors']:
+                    if pred_id in nodes:
+                        visit(pred_id)
+                        nodes[aid]['es'] = max(nodes[aid]['es'], nodes[pred_id]['ef'])
+                nodes[aid]['ef'] = nodes[aid]['es'] + nodes[aid]['duration']
+                visited.add(aid)
+
+            for aid in nodes:
+                visit(aid)
+
+        forward_pass()
+
+        # Project Finish Time
+        project_finish = max(n['ef'] for n in nodes.values()) if nodes else 0
+
+        # 2. Backward Pass (LS, LF)
+        def backward_pass():
+            visited = set()
+            def visit(aid):
+                if aid in visited: return
+                nodes[aid]['lf'] = project_finish
+                for succ_id in nodes[aid]['successors']:
+                    visit(succ_id)
+                    nodes[aid]['lf'] = min(nodes[aid]['lf'], nodes[succ_id]['ls'])
+                nodes[aid]['ls'] = nodes[aid]['lf'] - nodes[aid]['duration']
+                visited.add(aid)
+
+            for aid in nodes:
+                visit(aid)
+
+        backward_pass()
+
+        # 3. Calculate Float and Critical Path
+        critical_path = []
+        for aid in nodes:
+            nodes[aid]['float'] = nodes[aid]['ls'] - nodes[aid]['es']
+            nodes[aid]['is_critical'] = (nodes[aid]['float'] <= 0)
+            if nodes[aid]['is_critical']:
+                critical_path.append(aid)
+            
+            # Additional metric: "Most dependent on" (successor count)
+            nodes[aid]['successor_count'] = len(nodes[aid]['successors'])
+
+        return {
+            "nodes": nodes,
+            "project_finish": project_finish,
+            "critical_path_ids": critical_path
+        }
+    except Exception as e:
+        logger.error(f"Error calculating network diagram data: {e}")
+        return None

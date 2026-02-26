@@ -92,220 +92,324 @@ def record_activity_page():
     selected_project_str = st.selectbox("Select Project", project_list)
     project_id = project_map[selected_project_str]
     
-    # --- ACTIVITY VIEW FILTER ---
-    st.markdown('<div style="margin-bottom: 1rem;">', unsafe_allow_html=True)
-    view_mode = st.radio("Display Scope", ["All Activities", "My Activities"], horizontal=True, label_visibility="collapsed")
-    st.markdown('</div>', unsafe_allow_html=True)
+    # --- TABS FOR VIEW ---
+    tab_list, tab_graph = st.tabs(["Activity List", "Project Network Diagram"])
 
-    # 2. Fetch Activities
-    # Fetch all for the project first
-    all_activities = database.get_baseline_schedule(project_id)
-    
-    if all_activities is None or all_activities.empty:
-        st.warning("No activities found for this project.")
-        st.stop()
+    with tab_list:
+        # --- ACTIVITY VIEW FILTER ---
+        st.markdown('<div style="margin-bottom: 1rem;">', unsafe_allow_html=True)
+        view_mode = st.radio("Display Scope", ["All Activities", "My Activities"], horizontal=True, label_visibility="collapsed")
+        st.markdown('</div>', unsafe_allow_html=True)
 
-    # Apply filter based on toggle
-    if view_mode == "My Activities":
-        activities = all_activities[all_activities['responsible_user_id'] == current_user['id']]
-        if activities.empty:
-            st.info("You have no activities assigned to you in this project.")
+        # 2. Fetch Activities
+        # Fetch all for the project first
+        all_activities = database.get_baseline_schedule(project_id)
+        
+        if all_activities is None or all_activities.empty:
+            st.warning("No activities found for this project.")
             st.stop()
-    else:
-        activities = all_activities
-    
-    st.divider()
-    
-    # --- Submission Dialog ---
-    @st.dialog("Submit Documents", width="medium")
-    def submit_document_dialog(activity_id, activity_name, doc_type):
-        st.markdown(f"### Submitting {doc_type}: **{activity_name}**")
-        st.info(f"Uploading **{doc_type}(s)** is required to progress this task.")
-        st.markdown("---")
-        
-        uploaded_files = st.file_uploader(
-            f"Select {doc_type}(s) *",
-            type=['pdf', 'docx', 'xlsx', 'png', 'jpg', 'jpeg', 'csv', 'zip'],
-            accept_multiple_files=True,
-            key=f"upload_{activity_id}_{doc_type}"
-        )
-        
-        if uploaded_files:
-            st.success(f"📂 {len(uploaded_files)} file(s) selected.")
-            if st.button(f"✅ Upload {len(uploaded_files)} Document(s)", type="primary", use_container_width=True):
-                for uploaded_file in uploaded_files:
-                    # Determine blob name (path inside the container)
-                    blob_name = f"uploads/{project_id}/{activity_id}/{uploaded_file.name}"
-                    
-                    # Upload to Azure
-                    database.upload_file_to_azure(uploaded_file.getvalue(), blob_name)
-                    
-                    # Save record to DB (using the blob_name as the file_path)
-                    database.save_task_output(activity_id, uploaded_file.name, blob_name, current_user['id'], doc_type=doc_type)
-                
-                # Automatic status progression
-                if doc_type == "First Draft":
-                    database.update_activity_status(activity_id, 'Active', current_user['id'])
-                    st.success("First Draft(s) uploaded! Task is now officially STARTED.")
-                elif doc_type == "Final Document":
-                    database.update_activity_status(activity_id, 'Complete', current_user['id'])
-                    st.success("Final Document(s) uploaded! Task is now COMPLETE.")
-                else:
-                    st.success(f"{len(uploaded_files)} {doc_type}(s) uploaded successfully.")
-                
-                st.rerun()
-    
-    # --- Summary Stats (Scoped to visible activities) ---
-    total = len(activities)
-    completed = len(activities[activities['status'] == 'Complete'])
-    active = len(activities[activities['status'] == 'Active'])
-    pending = total - completed - active
-    
-    s1, s2, s3, s4 = st.columns(4)
-    with s1:
-        st.markdown(f'<div class="stat-card"><div class="stat-label">Total Tasks</div><div class="stat-value-container"><div class="stat-value">{total}</div></div></div>', unsafe_allow_html=True)
-    with s2:
-        pct_val = f"{completed/total*100:.0f}%" if total > 0 else "0%"
-        st.markdown(f'<div class="stat-card"><div class="stat-label">Completed</div><div class="stat-value-container"><div class="stat-value">{completed}</div><div class="stat-delta">↑ {pct_val}</div></div></div>', unsafe_allow_html=True)
-    with s3:
-        st.markdown(f'<div class="stat-card"><div class="stat-label">In Progress</div><div class="stat-value-container"><div class="stat-value">{active}</div></div></div>', unsafe_allow_html=True)
-    with s4:
-        st.markdown(f'<div class="stat-card"><div class="stat-label">Not Started</div><div class="stat-value-container"><div class="stat-value">{pending}</div></div></div>', unsafe_allow_html=True)
-    
-    st.divider()
-    st.subheader("Current Operational Status")
-    
-    # Sort by planned start
-    activities['planned_start'] = pd.to_datetime(activities['planned_start'])
-    activities = activities.sort_values('planned_start')
-    
-    for _, row in activities.iterrows():
-        status = row['status'] or 'Not Started'
-        
-        with st.container(border=True):
-            # --- EVEN MORE COMPACT HORIZONTAL LAYOUT ---
-            main_col1, main_col2, main_col3 = st.columns([2.5, 1.5, 2.0])
-            
-            with main_col1:
-                st.markdown(f"""
-                    <div style="display:flex; align-items:center; gap:10px; margin-bottom:4px;">
-                        <div class="op-title" style="margin-bottom:0;">{row["activity_name"]}</div>
-                    </div>
-                    <div style="display:flex; gap:8px; align-items:center;">
-                        <span class="badge {'badge-status-complete' if status == 'Complete' else ('badge-status-active' if status == 'Active' else 'badge-status-pending')}" style="margin:0;">
-                            {status.upper()}
-                        </span>
-                        <div class="op-meta" style="margin:0;"><i class="far fa-calendar-alt"></i> {row["planned_start"].strftime("%d %b")} - {row["planned_finish"]}</div>
-                    </div>
-                """, unsafe_allow_html=True)
-            
-            with main_col2:
-                resp_name = row.get('responsible_name')
-                display_name = resp_name if pd.notna(resp_name) and resp_name else "Unassigned"
-                st.markdown(f"""
-                    <div style="font-size:0.7rem; font-weight:600; color:#94a3b8; margin-bottom:2px; text-transform:uppercase;">Assignment</div>
-                    <div style="font-size:0.8rem; color:#e2e8f0; margin-bottom:6px;"><i class="fas fa-user-circle" style="color:#38bdf8;"></i> {display_name}</div>
-                    
-                    <div style="font-size:0.7rem; font-weight:600; color:#94a3b8; margin-bottom:2px; text-transform:uppercase;">Deliverable</div>
-                    <div style="font-size:0.8rem; color:#fbbf24; font-style:italic;"><i class="fas fa-file-contract"></i> {row.get('expected_output') or 'None'}</div>
-                """, unsafe_allow_html=True)
 
-            with main_col3:
-                # --- Actions Column (Side-by-Side) ---
-                if status == "Not Started":
-                    st.markdown('<div class="upload-btn">', unsafe_allow_html=True)
-                    if st.button("Start Phase", key=f"btn_{row['activity_id']}", use_container_width=True):
-                        submit_document_dialog(row['activity_id'], row['activity_name'], "First Draft")
-                    st.markdown('</div>', unsafe_allow_html=True)
-                    st.markdown('<div style="text-align:center; font-size:0.65rem; color:#ef4444; font-weight:700; margin-top:4px;">REQUIRES FIRST DRAFT</div>', unsafe_allow_html=True)
-                
-                elif status == "Active":
-                    has_risks = database.has_open_risks(row['activity_id'])
-                    
-                    if has_risks:
-                        st.markdown('<div style="background:rgba(239,68,68,0.1); border:1px solid #ef4444; border-radius:6px; padding:4px; text-align:center; margin-bottom:8px;">', unsafe_allow_html=True)
-                        st.markdown('<div style="color:#ef4444; font-size:0.7rem; font-weight:700;"><i class="fas fa-exclamation-triangle"></i> OPEN RISKS LINKED</div>', unsafe_allow_html=True)
-                        st.markdown('</div>', unsafe_allow_html=True)
-                    
-                    # SIDE-BY-SIDE BUTTONS
-                    btn_c1, btn_c2 = st.columns(2)
-                    with btn_c1:
-                        st.markdown('<div class="add-btn">', unsafe_allow_html=True)
-                        if st.button("Upload Draft", key=f"draft_{row['activity_id']}", use_container_width=True):
-                            submit_document_dialog(row['activity_id'], row['activity_name'], "Regular Draft")
-                        st.markdown('</div>', unsafe_allow_html=True)
-                    
-                    with btn_c2:
-                        st.markdown('<div class="check-btn">', unsafe_allow_html=True)
-                        # REMOVED HARD GATE: button is no longer disabled by has_risks
-                        if st.button("Complete", key=f"btn_{row['activity_id']}", use_container_width=True, type="primary"):
-                            submit_document_dialog(row['activity_id'], row['activity_name'], "Final Document")
-                        st.markdown('</div>', unsafe_allow_html=True)
-                
-                elif status == "Complete":
-                    is_privileged = current_user['role'] in ['admin', 'pm', 'executive']
-                    if is_privileged:
-                        st.markdown('<div class="refresh-btn">', unsafe_allow_html=True)
-                        if st.button("Reopen Task", key=f"btn_{row['activity_id']}", use_container_width=True):
-                            database.update_activity_status(row['activity_id'], 'Active', current_user['id'])
-                            st.rerun()
-                        st.markdown('</div>', unsafe_allow_html=True)
-                    else:
-                        st.markdown('<div class="check-btn" style="opacity:0.5;">', unsafe_allow_html=True)
-                        st.button("Done", disabled=True, key=f"btn_{row['activity_id']}", use_container_width=True)
-                        st.markdown('</div>', unsafe_allow_html=True)
-
-            # Sub-row for existing deliverables (if any)
-            if status != "Not Started":
-                outputs = database.get_task_outputs(row['activity_id'])
-                if not outputs.empty:
-                    st.markdown('<div style="height:10px;"></div>', unsafe_allow_html=True)
-                    with st.expander(f"VIEW SUBMITTED DOCUMENTS ({len(outputs)})", expanded=False, icon=":material/folder_open:"):
-                        # List links vertically for a cleaner "File Explorer" feel
-                        for _, out in outputs.iterrows():
-                            blob_name = out['file_path']
-                            data = None
-                            try:
-                                data = database.download_file_from_azure(blob_name)
-                            except:
-                                pass
-
-                            if data:
-                                b64 = base64.b64encode(data).decode()
-                                
-                                # Determine icon based on doc_type or filename
-                                icon = "fa-file-pdf" if out['file_name'].endswith('.pdf') else "fa-file-alt"
-                                label_color = "#34d399" if out.get('doc_type') == 'Final Document' else "#38bdf8"
-                                
-                                st.markdown(f"""
-                                    <div style="margin-bottom: 8px; display: flex; align-items: center; gap: 10px;">
-                                        <i class="fas {icon}" style="color: {label_color};"></i>
-                                        <a href="data:application/octet-stream;base64,{b64}" download="{out['file_name']}" 
-                                           style="color: {label_color}; text-decoration: none; font-size: 0.85rem; font-weight: 500;">
-                                           {out['file_name']}
-                                        </a>
-                                        <span style="font-size: 0.7rem; color: #94a3b8; margin-left: auto;">
-                                            Uploaded by {out['uploader_name']} on {str(out['uploaded_at'])[:10]}
-                                        </span>
-                                    </div>
-                                """, unsafe_allow_html=True)
-        
-        st.markdown('<div style="height:5px;"></div>', unsafe_allow_html=True)
-
-    # Activity Audit Log
-    with st.expander("Activity Audit Log (History)"):
-        logs = database.get_df('''
-            SELECT al.event_type, al.event_date, bs.activity_name, u.full_name as recorded_by
-            FROM activity_log al
-            JOIN baseline_schedule bs ON al.activity_id = bs.activity_id
-            JOIN users u ON al.recorded_by = u.user_id
-            WHERE bs.project_id = %s
-            ORDER BY al.log_id DESC
-        ''', (project_id,))
-        if not logs.empty:
-            st.dataframe(logs, use_container_width=True, hide_index=True)
+        # Apply filter based on toggle
+        if view_mode == "My Activities":
+            activities = all_activities[all_activities['responsible_user_id'] == current_user['id']]
+            if activities.empty:
+                st.info("You have no activities assigned to you in this project.")
+                st.stop()
         else:
-            st.caption("No activity events recorded yet.")
+            activities = all_activities
+        
+        st.divider()
+        
+        # --- Submission Dialog ---
+        @st.dialog("Submit Documents", width="medium")
+        def submit_document_dialog(activity_id, activity_name, doc_type):
+            st.markdown(f"### Submitting {doc_type}: **{activity_name}**")
+            st.info(f"Uploading **{doc_type}(s)** is required to progress this task.")
+            st.markdown("---")
+            
+            uploaded_files = st.file_uploader(
+                f"Select {doc_type}(s) *",
+                type=['pdf', 'docx', 'xlsx', 'png', 'jpg', 'jpeg', 'csv', 'zip'],
+                accept_multiple_files=True,
+                key=f"upload_{activity_id}_{doc_type}"
+            )
+            
+            if uploaded_files:
+                st.success(f"📂 {len(uploaded_files)} file(s) selected.")
+                if st.button(f"✅ Upload {len(uploaded_files)} Document(s)", type="primary", use_container_width=True):
+                    for uploaded_file in uploaded_files:
+                        # Determine blob name (path inside the container)
+                        blob_name = f"uploads/{project_id}/{activity_id}/{uploaded_file.name}"
+                        
+                        # Upload to Azure
+                        database.upload_file_to_azure(uploaded_file.getvalue(), blob_name)
+                        
+                        # Save record to DB (using the blob_name as the file_path)
+                        database.save_task_output(activity_id, uploaded_file.name, blob_name, current_user['id'], doc_type=doc_type)
+                    
+                    # Automatic status progression
+                    if doc_type == "First Draft":
+                        database.update_activity_status(activity_id, 'Active', current_user['id'])
+                        st.success("First Draft(s) uploaded! Task is now officially STARTED.")
+                    elif doc_type == "Final Document":
+                        database.update_activity_status(activity_id, 'Complete', current_user['id'])
+                        st.success("Final Document(s) uploaded! Task is now COMPLETE.")
+                    else:
+                        st.success(f"{len(uploaded_files)} {doc_type}(s) uploaded successfully.")
+                    
+                    st.rerun()
+        
+        # --- Summary Stats (Scoped to visible activities) ---
+        total = len(activities)
+        completed = len(activities[activities['status'] == 'Complete'])
+        active = len(activities[activities['status'] == 'Active'])
+        pending = total - completed - active
+        
+        s1, s2, s3, s4 = st.columns(4)
+        with s1:
+            st.markdown(f'<div class="stat-card"><div class="stat-label">Total Tasks</div><div class="stat-value-container"><div class="stat-value">{total}</div></div></div>', unsafe_allow_html=True)
+        with s2:
+            pct_val = f"{completed/total*100:.0f}%" if total > 0 else "0%"
+            st.markdown(f'<div class="stat-card"><div class="stat-label">Completed</div><div class="stat-value-container"><div class="stat-value">{completed}</div><div class="stat-delta">↑ {pct_val}</div></div></div>', unsafe_allow_html=True)
+        with s3:
+            st.markdown(f'<div class="stat-card"><div class="stat-label">In Progress</div><div class="stat-value-container"><div class="stat-value">{active}</div></div></div>', unsafe_allow_html=True)
+        with s4:
+            st.markdown(f'<div class="stat-card"><div class="stat-label">Not Started</div><div class="stat-value-container"><div class="stat-value">{pending}</div></div></div>', unsafe_allow_html=True)
+        
+        st.divider()
+        st.subheader("Current Operational Status")
+        
+        # Sort by planned start
+        activities['planned_start'] = pd.to_datetime(activities['planned_start'])
+        activities = activities.sort_values('planned_start')
+        
+        for _, row in activities.iterrows():
+            status = row['status'] or 'Not Started'
+            
+            with st.container(border=True):
+                # --- EVEN MORE COMPACT HORIZONTAL LAYOUT ---
+                main_col1, main_col2, main_col3 = st.columns([2.5, 1.5, 2.0])
+                
+                with main_col1:
+                    st.markdown(f"""
+                        <div style="display:flex; align-items:center; gap:10px; margin-bottom:4px;">
+                            <div class="op-title" style="margin-bottom:0;">{row["activity_name"]}</div>
+                        </div>
+                        <div style="display:flex; gap:8px; align-items:center;">
+                            <span class="badge {'badge-status-complete' if status == 'Complete' else ('badge-status-active' if status == 'Active' else 'badge-status-pending')}" style="margin:0;">
+                                {status.upper()}
+                            </span>
+                            <div class="op-meta" style="margin:0;"><i class="far fa-calendar-alt"></i> {row["planned_start"].strftime("%d %b")} - {row["planned_finish"]}</div>
+                        </div>
+                    """, unsafe_allow_html=True)
+                
+                with main_col2:
+                    resp_name = row.get('responsible_name')
+                    display_name = resp_name if pd.notna(resp_name) and resp_name else "Unassigned"
+                    st.markdown(f"""
+                        <div style="font-size:0.7rem; font-weight:600; color:#94a3b8; margin-bottom:2px; text-transform:uppercase;">Assignment</div>
+                        <div style="font-size:0.8rem; color:#e2e8f0; margin-bottom:6px;"><i class="fas fa-user-circle" style="color:#38bdf8;"></i> {display_name}</div>
+                        
+                        <div style="font-size:0.7rem; font-weight:600; color:#94a3b8; margin-bottom:2px; text-transform:uppercase;">Deliverable</div>
+                        <div style="font-size:0.8rem; color:#fbbf24; font-style:italic;"><i class="fas fa-file-contract"></i> {row.get('expected_output') or 'None'}</div>
+                    """, unsafe_allow_html=True)
+
+                with main_col3:
+                    # --- Actions Column (Side-by-Side) ---
+                    if status == "Not Started":
+                        st.markdown('<div class="upload-btn">', unsafe_allow_html=True)
+                        if st.button("Start Phase", key=f"btn_{row['activity_id']}", use_container_width=True):
+                            submit_document_dialog(row['activity_id'], row['activity_name'], "First Draft")
+                        st.markdown('</div>', unsafe_allow_html=True)
+                        st.markdown('<div style="text-align:center; font-size:0.65rem; color:#ef4444; font-weight:700; margin-top:4px;">REQUIRES FIRST DRAFT</div>', unsafe_allow_html=True)
+                    
+                    elif status == "Active":
+                        has_risks = database.has_open_risks(row['activity_id'])
+                        
+                        if has_risks:
+                            st.markdown('<div style="background:rgba(239,68,68,0.1); border:1px solid #ef4444; border-radius:6px; padding:4px; text-align:center; margin-bottom:8px;">', unsafe_allow_html=True)
+                            st.markdown('<div style="color:#ef4444; font-size:0.7rem; font-weight:700;"><i class="fas fa-exclamation-triangle"></i> OPEN RISKS LINKED</div>', unsafe_allow_html=True)
+                            st.markdown('</div>', unsafe_allow_html=True)
+                        
+                        # SIDE-BY-SIDE BUTTONS
+                        btn_c1, btn_c2 = st.columns(2)
+                        with btn_c1:
+                            st.markdown('<div class="add-btn">', unsafe_allow_html=True)
+                            if st.button("Upload Draft", key=f"draft_{row['activity_id']}", use_container_width=True):
+                                submit_document_dialog(row['activity_id'], row['activity_name'], "Regular Draft")
+                            st.markdown('</div>', unsafe_allow_html=True)
+                        
+                        with btn_c2:
+                            st.markdown('<div class="check-btn">', unsafe_allow_html=True)
+                            # REMOVED HARD GATE: button is no longer disabled by has_risks
+                            if st.button("Complete", key=f"btn_{row['activity_id']}", use_container_width=True, type="primary"):
+                                submit_document_dialog(row['activity_id'], row['activity_name'], "Final Document")
+                            st.markdown('</div>', unsafe_allow_html=True)
+                    
+                    elif status == "Complete":
+                        is_privileged = current_user['role'] in ['admin', 'pm', 'executive']
+                        if is_privileged:
+                            st.markdown('<div class="refresh-btn">', unsafe_allow_html=True)
+                            if st.button("Reopen Task", key=f"btn_{row['activity_id']}", use_container_width=True):
+                                database.update_activity_status(row['activity_id'], 'Active', current_user['id'])
+                                st.rerun()
+                            st.markdown('</div>', unsafe_allow_html=True)
+                        else:
+                            st.markdown('<div class="check-btn" style="opacity:0.5;">', unsafe_allow_html=True)
+                            st.button("Done", disabled=True, key=f"btn_{row['activity_id']}", use_container_width=True)
+                            st.markdown('</div>', unsafe_allow_html=True)
+
+                # Sub-row for existing deliverables (if any)
+                if status != "Not Started":
+                    outputs = database.get_task_outputs(row['activity_id'])
+                    if not outputs.empty:
+                        st.markdown('<div style="height:10px;"></div>', unsafe_allow_html=True)
+                        with st.expander(f"VIEW SUBMITTED DOCUMENTS ({len(outputs)})", expanded=False, icon=":material/folder_open:"):
+                            # List links vertically for a cleaner "File Explorer" feel
+                            for _, out in outputs.iterrows():
+                                blob_name = out['file_path']
+                                data = None
+                                try:
+                                    data = database.download_file_from_azure(blob_name)
+                                except:
+                                    pass
+
+                                if data:
+                                    b64 = base64.b64encode(data).decode()
+                                    
+                                    # Determine icon based on doc_type or filename
+                                    icon = "fa-file-pdf" if out['file_name'].endswith('.pdf') else "fa-file-alt"
+                                    label_color = "#34d399" if out.get('doc_type') == 'Final Document' else "#38bdf8"
+                                    
+                                    st.markdown(f"""
+                                        <div style="margin-bottom: 8px; display: flex; align-items: center; gap: 10px;">
+                                            <i class="fas {icon}" style="color: {label_color};"></i>
+                                            <a href="data:application/octet-stream;base64,{b64}" download="{out['file_name']}" 
+                                               style="color: {label_color}; text-decoration: none; font-size: 0.85rem; font-weight: 500;">
+                                               {out['file_name']}
+                                            </a>
+                                            <span style="font-size: 0.7rem; color: #94a3b8; margin-left: auto;">
+                                                Uploaded by {out['uploader_name']} on {str(out['uploaded_at'])[:10]}
+                                            </span>
+                                        </div>
+                                    """, unsafe_allow_html=True)
+            
+            st.markdown('<div style="height:5px;"></div>', unsafe_allow_html=True)
+
+        # Activity Audit Log
+        with st.expander("Activity Audit Log (History)"):
+            logs = database.get_df('''
+                SELECT al.event_type, al.event_date, bs.activity_name, u.full_name as recorded_by
+                FROM activity_log al
+                JOIN baseline_schedule bs ON al.activity_id = bs.activity_id
+                JOIN users u ON al.recorded_by = u.user_id
+                WHERE bs.project_id = %s
+                ORDER BY al.log_id DESC
+            ''', (project_id,))
+            if not logs.empty:
+                st.dataframe(logs, use_container_width=True, hide_index=True)
+            else:
+                st.caption("No activity events recorded yet.")
+
+    with tab_graph:
+        import calculations
+        import html  # Added for escaping
+        st.markdown("### Strategic Network Diagram (CPM)")
+        st.info("The diagram below visualizes task dependencies. Red borders indicate the **Critical Path** — any delay here shifts the final project end date.")
+        
+        network_data = calculations.get_network_diagram_data(project_id)
+        
+        if not network_data or not network_data['nodes']:
+            st.info("No dependency data available. Add activities and dependencies in Project Setup.")
+        else:
+            from graphviz import Digraph
+            dot = Digraph(comment='Project Network Diagram')
+            # Changed to TB (Top to Bottom) for better readability on web pages
+            dot.attr(rankdir='TB', size='10,12', bgcolor='transparent', ranksep='0.5', nodesep='0.4')
+            
+            # Node styling
+            for aid, node in network_data['nodes'].items():
+                # Color based on status
+                status = node['status']
+                fillcolor = '#10b981' if status == 'Complete' else ('#f59e0b' if status == 'Active' else '#f8fafc')
+                fontcolor = 'white' if status in ['Complete', 'Active'] else '#1e293b'
+                
+                # Critical Path Border
+                penwidth = '3' if node['is_critical'] else '1'
+                color = '#ef4444' if node['is_critical'] else '#94a3b8'
+                
+                # Escape HTML characters in activity name to prevent rendering failures
+                safe_name = html.escape(node['activity_name'])
+                resp_name = html.escape(node.get('responsible_name') or 'Unassigned')
+                
+                # Format dates
+                d_start = pd.to_datetime(node['planned_start']).strftime('%d %b') if node['planned_start'] else 'N/A'
+                d_end = pd.to_datetime(node['planned_finish']).strftime('%d %b') if node['planned_finish'] else 'N/A'
+
+                # Escape HTML characters in activity name to prevent rendering failures
+                safe_name = html.escape(node['activity_name'])
+                resp_name = html.escape(node.get('responsible_name') or 'Unassigned')
+                
+                # Format dates
+                d_start = pd.to_datetime(node['planned_start']).strftime('%d %b') if node['planned_start'] else 'N/A'
+                d_end = pd.to_datetime(node['planned_finish']).strftime('%d %b') if node['planned_finish'] else 'N/A'
+
+                # Professional flattened HTML label for perfect centering
+                table_border = '2' if node['is_critical'] else '1'
+                table_color = '#ef4444' if node['is_critical'] else '#cbd5e1'
+                
+                label = f"""<
+                    <TABLE BORDER="{table_border}" COLOR="{table_color}" CELLBORDER="1" CELLSPACING="0" CELLPADDING="5" WIDTH="220" BGCOLOR="#ffffff">
+                      <TR>
+                        <TD COLSPAN="2" ALIGN="CENTER" BGCOLOR="{fillcolor}" CELLPADDING="10" BORDER="0">
+                          <FONT COLOR="{fontcolor}" POINT-SIZE="11"><B>{safe_name}</B></FONT><BR ALIGN="CENTER"/>
+                          <FONT COLOR="{fontcolor}" POINT-SIZE="8">Assigned: {resp_name}</FONT>
+                        </TD>
+                      </TR>
+                      <TR>
+                        <TD COLSPAN="2" ALIGN="CENTER" COLOR="#e2e8f0"><FONT POINT-SIZE="8" COLOR="#64748b"><B>{d_start} to {d_end}</B></FONT></TD>
+                      </TR>
+                      <TR>
+                        <TD ALIGN="CENTER" COLOR="#e2e8f0"><FONT POINT-SIZE="8" COLOR="#64748b">ES: {node['es']}</FONT></TD>
+                        <TD ALIGN="CENTER" COLOR="#e2e8f0"><FONT POINT-SIZE="8" COLOR="#64748b">EF: {node['ef']}</FONT></TD>
+                      </TR>
+                      <TR>
+                        <TD ALIGN="CENTER" COLOR="#e2e8f0"><FONT POINT-SIZE="8" COLOR="#64748b">LS: {node['ls']}</FONT></TD>
+                        <TD ALIGN="CENTER" COLOR="#e2e8f0"><FONT POINT-SIZE="8" COLOR="#64748b">LF: {node['lf']}</FONT></TD>
+                      </TR>
+                      <TR>
+                        <TD COLSPAN="2" ALIGN="CENTER" BGCOLOR="{color if node['is_critical'] else '#f8fafc'}" BORDER="0">
+                            <FONT POINT-SIZE="9" COLOR="{ 'white' if node['is_critical'] else '#64748b'}"><B>FLOAT: {node['float']}</B></FONT>
+                        </TD>
+                      </TR>
+                    </TABLE>
+                >"""
+                
+                dot.node(str(aid), label=label, shape='none', margin='0')
+            
+            # Edges
+            for aid, node in network_data['nodes'].items():
+                for succ_id in node['successors']:
+                    is_crit_edge = (aid in network_data['critical_path_ids'] and succ_id in network_data['critical_path_ids'])
+                    edge_color = '#ef4444' if is_crit_edge else '#cbd5e1'
+                    edge_width = '2.5' if is_crit_edge else '1.0'
+                    dot.edge(str(aid), str(succ_id), color=edge_color, penwidth=edge_width, arrowhead='vee', arrowsize='0.8')
+            
+            st.graphviz_chart(dot, use_container_width=True)
+            
+            # Highlight most dependent activities
+            st.markdown("---")
+            st.subheader("Dependency Insights")
+            nodes_list = sorted(network_data['nodes'].values(), key=lambda x: x['successor_count'], reverse=True)
+            
+            m1, m2 = st.columns(2)
+            with m1:
+                top_dep = nodes_list[0] if nodes_list else None
+                if top_dep:
+                    st.metric("Critical Dependency Hub", top_dep['activity_name'], f"{top_dep['successor_count']} Successors")
+            with m2:
+                crit_count = len(network_data['critical_path_ids'])
+                st.metric("Critical Path Length", f"{crit_count} Tasks", f"Float: 0")
 
 if __name__ == "__main__":
     record_activity_page()
