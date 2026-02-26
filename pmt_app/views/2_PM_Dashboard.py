@@ -8,6 +8,7 @@ import plotly.express as px
 import os
 import styles
 import pdf_generator
+import base64
 
 # Page Config
 st.set_page_config(
@@ -331,6 +332,37 @@ def pm_dashboard():
         available_cols = [c for c in display_cols if c in df.columns]
         st.dataframe(df[available_cols], use_container_width=True, hide_index=True)
 
+    @st.dialog("All Task Deliverables", width="large")
+    def show_full_deliverables(all_outputs):
+        st.markdown("### Project Output Inventory")
+        st.info("Click on a file name to download it directly.")
+        
+        # We need to render this as HTML to support the base64 download links in a "table" look
+        # but for simplicity in a dialog, a clean dataframe or repeated rows works too.
+        # However, the user wants "click to download", so I'll use a loop with download links.
+        
+        for _, out in all_outputs.iterrows():
+            data = None
+            try:
+                data = database.download_file_from_azure(out['file_path'])
+            except:
+                pass
+            
+            uploaded_date = str(out['uploaded_at'])[:10] if pd.notna(out['uploaded_at']) else 'N/A'
+            
+            with st.container(border=True):
+                c1, c2, c3 = st.columns([2, 2, 1])
+                with c1:
+                    st.markdown(f"**Task**: {out['activity_name']}")
+                with c2:
+                    if data:
+                        b64 = base64.b64encode(data).decode()
+                        st.markdown(f'<i class="fas fa-file-download" style="color:#10b981;"></i> <a href="data:application/octet-stream;base64,{b64}" download="{out["file_name"]}" style="color:#5fa2e8; text-decoration:none; font-weight:500;">{out["file_name"]}</a>', unsafe_allow_html=True)
+                    else:
+                        st.markdown(f"File: {out['file_name']} (Error)")
+                with c3:
+                    st.caption(f"By {out['uploader_name']} on {uploaded_date}")
+
     # --- ROW 1: SCHEDULE & KEY METRICS ---
     r1_col1, r1_col2 = st.columns([1, 1])
     
@@ -593,41 +625,42 @@ def pm_dashboard():
 
     st.markdown('<div style="height:30px"></div>', unsafe_allow_html=True)
 
-    # --- ROW 5: TASK DELIVERABLES (NEW) ---
-    st.markdown("### <i class='fas fa-paperclip fa-icon'></i> Task Deliverables", unsafe_allow_html=True)
+    # --- ROW 5: TASK DELIVERABLES ---
+    col_dl_h, col_dl_b = st.columns([3, 1])
+    with col_dl_h: st.markdown("### <i class='fas fa-paperclip fa-icon'></i> Task Deliverables", unsafe_allow_html=True)
     
     all_outputs = database.get_all_outputs_for_project(project_id)
     
     if not all_outputs.empty:
+        with col_dl_b:
+            st.markdown('<div class="list-btn">', unsafe_allow_html=True)
+            if st.button("Full View", key="btn_full_dl", use_container_width=True): show_full_deliverables(all_outputs)
+            st.markdown('</div>', unsafe_allow_html=True)
+
         deliverables_html = '<div style="background-color: var(--card-bg); padding: 15px; border-radius: 12px; border: 1px solid rgba(128, 128, 128, 0.1); box-shadow: 0 2px 5px rgba(0,0,0,0.02);">'
-        deliverables_html += '<div style="display:flex; padding:8px 0; border-bottom:2px solid rgba(128, 128, 128, 0.2); margin-bottom:4px;"><span style="flex:2; font-size:0.75rem; opacity:0.8; font-weight:600; text-transform:uppercase;">Task</span><span style="flex:2; font-size:0.75rem; opacity:0.8; font-weight:600; text-transform:uppercase;">Output File</span><span style="flex:1; font-size:0.75rem; opacity:0.8; font-weight:600; text-transform:uppercase;">Uploaded By</span><span style="flex:1; font-size:0.75rem; opacity:0.8; font-weight:600; text-transform:uppercase;">Date</span></div>'
+        deliverables_html += '<div style="display:flex; padding:8px 0; border-bottom:2px solid rgba(128, 128, 128, 0.2); margin-bottom:4px;"><span style="flex:2; font-size:0.75rem; opacity:0.8; font-weight:600; text-transform:uppercase;">Task</span><span style="flex:2; font-size:0.75rem; opacity:0.8; font-weight:600; text-transform:uppercase;">Output File (Click to Download)</span><span style="flex:1; font-size:0.75rem; opacity:0.8; font-weight:600; text-transform:uppercase;">By</span><span style="flex:1; font-size:0.75rem; opacity:0.8; font-weight:600; text-transform:uppercase;">Date</span></div>'
         
-        for _, out in all_outputs.iterrows():
+        # Only show first 4
+        for _, out in all_outputs.head(4).iterrows():
             uploaded_date = str(out['uploaded_at'])[:10] if pd.notna(out['uploaded_at']) else 'N/A'
-            deliverables_html += f'<div class="deliverable-row"><span style="flex:2; font-weight:500; font-size:0.9rem;">{out["activity_name"]}</span><span style="flex:2; font-size:0.85rem; color:#5fa2e8;">{out["file_name"]}</span><span style="flex:1; font-size:0.8rem; opacity:0.8;">{out["uploader_name"]}</span><span style="flex:1; font-size:0.8rem; opacity:0.8;">{uploaded_date}</span></div>'
-        
-        deliverables_html += '</div>'
-        st.markdown(deliverables_html, unsafe_allow_html=True)
-        
-        # Download buttons
-        st.markdown('<div style="height:10px"></div>', unsafe_allow_html=True)
-        dl_cols = st.columns(min(len(all_outputs), 4))
-        for i, (_, out) in enumerate(all_outputs.iterrows()):
+            
+            # Fetch data for download link
             data = None
             try:
                 data = database.download_file_from_azure(out['file_path'])
             except:
                 pass
-
+            
             if data:
-                with dl_cols[i % len(dl_cols)]:
-                    st.markdown('<div class="download-btn">', unsafe_allow_html=True)
-                    st.download_button(
-                        out['file_name'], data=data,
-                        file_name=out['file_name'], key=f"dash_dl_{out['output_id']}",
-                        use_container_width=True
-                    )
-                    st.markdown('</div>', unsafe_allow_html=True)
+                b64 = base64.b64encode(data).decode()
+                file_link = f'<a href="data:application/octet-stream;base64,{b64}" download="{out["file_name"]}" style="color:#5fa2e8; text-decoration:none; font-weight:500;">{out["file_name"]}</a>'
+            else:
+                file_link = f'<span style="color:#94a3b8;">{out["file_name"]}</span>'
+
+            deliverables_html += f'<div class="deliverable-row"><span style="flex:2; font-weight:500; font-size:0.9rem;">{out["activity_name"]}</span><span style="flex:2; font-size:0.85rem;">{file_link}</span><span style="flex:1; font-size:0.8rem; opacity:0.8;">{out["uploader_name"]}</span><span style="flex:1; font-size:0.8rem; opacity:0.8;">{uploaded_date}</span></div>'
+        
+        deliverables_html += '</div>'
+        st.markdown(deliverables_html, unsafe_allow_html=True)
     else:
         st.info("No deliverables uploaded yet. Outputs will appear here once tasks are marked as complete with uploaded files.")
 

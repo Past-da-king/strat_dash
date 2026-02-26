@@ -265,9 +265,9 @@ def project_repository_page():
                                     st.markdown(make_download_link(data, item['name'], "Download Permanent"), unsafe_allow_html=True)
                                 except: st.caption("File missing")
                             
-                            # Delete Action (In-place button styled as plain text)
-                            st.markdown('<div class="delete-text-link-wrapper">', unsafe_allow_html=True)
-                            if st.button("Delete Permanent", key=f"del_repo_{item['file_id']}"):
+                            # Delete Action (Styled proper button)
+                            st.markdown('<div class="danger-btn">', unsafe_allow_html=True)
+                            if st.button("Delete Permanent", key=f"del_repo_{item['file_id']}", use_container_width=True):
                                 database.delete_repo_item(item['file_id'])
                                 st.rerun()
                             st.markdown('</div>', unsafe_allow_html=True)
@@ -302,10 +302,12 @@ def project_repository_page():
                                     st.markdown(make_download_link(data, out['file_name'], "Download Permanent"), unsafe_allow_html=True)
                                 except: st.caption("File missing")
                                 
-                                # Delete Action (In-place button styled as plain text)
-                                if st.button("Delete Permanent", key=f"del_act_{out['output_id']}"):
+                                # Delete Action (Styled proper button)
+                                st.markdown('<div class="danger-btn">', unsafe_allow_html=True)
+                                if st.button("Delete Permanent", key=f"del_act_{out['output_id']}", use_container_width=True):
                                     database.delete_task_output(out['output_id'])
                                     st.rerun()
+                                st.markdown('</div>', unsafe_allow_html=True)
                                 render_linked_context('A', out['output_id'])
 
     # =========================================================================
@@ -337,10 +339,12 @@ def project_repository_page():
                                     st.markdown(make_download_link(data, fname, "Download Permanent"), unsafe_allow_html=True)
                                 except: st.caption("File missing")
                                 
-                                # Delete Action (In-place button styled as plain text)
-                                if st.button("Delete Permanent", key=f"del_risk_{r['risk_id']}_{hash(p)}"):
+                                # Delete Action (Styled proper button)
+                                st.markdown('<div class="danger-btn">', unsafe_allow_html=True)
+                                if st.button("Delete Permanent", key=f"del_risk_{r['risk_id']}_{hash(p)}", use_container_width=True):
                                     database.remove_risk_closure_file(r['risk_id'], p)
                                     st.rerun()
+                                st.markdown('</div>', unsafe_allow_html=True)
                                 render_linked_context('K', r['risk_id'])
 
 

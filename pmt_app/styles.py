@@ -73,56 +73,32 @@ def global_css():
         }}
 
         /* --- Button Styling --- */
-        /* NUCLEAR RESET: Force buttons inside popovers to be text-only */
-        [data-testid="stPopoverContent"] button,
-        [data-testid="stPopoverContent"] [data-testid^="baseButton"],
-        [data-testid="stPopoverContent"] div,
-        [data-testid="stPopoverContent"] a,
-        [data-testid="stPopoverContent"] summary {{
-            background: transparent !important;
-            background-color: transparent !important;
-            background-image: none !important;
+        /* Global Buttons */
+        button[data-testid="baseButton-secondary"], 
+        button[data-testid="baseButton-primary"],
+        .stButton > button, 
+        .stDownloadButton > button {{
+            color: white !important;
+            background: var(--primary-gradient) !important;
             border: none !important;
-            box-shadow: none !important;
-            outline: none !important;
-            border-radius: 0 !important;
-            min-height: unset !important;
-            height: auto !important;
-            width: auto !important;
-            padding: 4px 0 !important;
-            color: #38bdf8 !important;
-            text-align: left !important;
-            justify-content: flex-start !important;
-            text-decoration: none !important;
+            border-radius: var(--radius-sm) !important;
+            font-weight: 600 !important;
+            transition: all 0.3s ease !important;
         }}
 
-        [data-testid="stPopoverContent"] button p,
-        [data-testid="stPopoverContent"] button div {{
-            margin: 0 !important;
-            padding: 0 !important;
-            color: inherit !important;
-            font-size: 0.95rem !important;
-            font-weight: 500 !important;
+        /* Download Button Specific */
+        .stDownloadButton > button {{
+            background: linear-gradient(135deg, #059669 0%, #34d399 100%) !important;
         }}
 
-        /* Hover Feedback */
-        [data-testid="stPopoverContent"] button:hover,
-        [data-testid="stPopoverContent"] button:hover p,
-        [data-testid="stPopoverContent"] a:hover {{
-            text-decoration: underline !important;
-            color: #7dd3fc !important;
-            background: transparent !important;
+        /* Danger Button Specific (Manual Override) */
+        .danger-btn button {{
+            background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%) !important;
+            border: 1px solid rgba(255,255,255,0.1) !important;
         }}
-
-        /* Red Delete Link Specificity */
-        [data-testid="stPopoverContent"] button:has(p:contains("Delete")),
-        [data-testid="stPopoverContent"] button:has(div:contains("Delete")),
-        [data-testid="stPopoverContent"] button:has(p:contains("Permanent")) {{
-            color: #f87171 !important;
-        }}
-        [data-testid="stPopoverContent"] button:has(p:contains("Delete")) p,
-        [data-testid="stPopoverContent"] button:has(p:contains("Permanent")) p {{
-            color: #f87171 !important;
+        .danger-btn button:hover {{
+            background: linear-gradient(135deg, #f87171 0%, #ef4444 100%) !important;
+            box-shadow: 0 0 12px rgba(239, 68, 68, 0.4) !important;
         }}
 
         /* Wipe out expander box look inside popovers */
@@ -133,24 +109,6 @@ def global_css():
         }}
         [data-testid="stPopoverContent"] [data-testid="stExpander"] summary svg {{
             display: none !important;
-        }}
-
-        /* Global Buttons (Outside Popovers only) */
-        button[data-testid="baseButton-secondary"]:not([data-testid="stPopoverContent"] *), 
-        button[data-testid="baseButton-primary"]:not([data-testid="stPopoverContent"] *),
-        .stButton > button:not([data-testid="stPopoverContent"] *), 
-        .stDownloadButton > button:not([data-testid="stPopoverContent"] *) {{
-            color: white !important;
-            background: var(--primary-gradient) !important;
-            border: none !important;
-            border-radius: var(--radius-sm) !important;
-            font-weight: 600 !important;
-            transition: all 0.3s ease !important;
-        }}
-
-        /* Download Button Specific (Outside Popovers) */
-        .stDownloadButton > button:not([data-testid="stPopoverContent"] *) {{
-            background: linear-gradient(135deg, #059669 0%, #34d399 100%) !important;
         }}
 
         /* --- Metric & KPI Card Styling (Theme-Aware) --- */
@@ -301,6 +259,7 @@ def global_css():
             box-shadow: var(--shadow-lg) !important;
             border-color: var(--primary-light) !important;
             background: rgba(255, 255, 255, 0.05) !important;
+            border: 1px solid var(--primary-light) !important;
         }}
         .project-card-title {{
             font-size: 1.25rem !important;
