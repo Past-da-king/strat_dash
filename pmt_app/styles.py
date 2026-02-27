@@ -140,13 +140,19 @@ def global_css():
         }}
 
         /* --- Health Icons --- */
-        .health-icon {{
-            width: 42px; height: 42px; border-radius: 50%;
-            display: flex; align-items: center; justify-content: center;
-            font-size: 1.1rem; font-weight: 700;
+        .deliverable-row {{
+            display: flex; justify-content: space-between; align-items: center;
+            border-bottom: 1px solid rgba(128, 128, 128, 0.1); padding: 12px 0;
         }}
+        .badge-sm {{
+            display: inline-block; padding: 2px 8px; border-radius: 12px;
+            font-size: 0.7rem; font-weight: 600;
+        }}
+        .badge-user {{ background: #eff6ff !important; color: #2c5aa0 !important; }}
+        .badge-output {{ background: #fefce8 !important; color: #a16207 !important; }}
+        .badge-status {{ background: #dbeafe !important; color: #1e40af !important; }}
 
-/* --- Sidebar --- */
+        /* --- Metric & KPI Card Styling (Theme-Aware) --- */
         [data-testid="stSidebar"] {{
             background: linear-gradient(180deg, #1a1a2e 0%, #16213e 100%) !important;
         }}
@@ -347,6 +353,61 @@ def global_css():
         .download-btn-subtle button:hover {{
             background: rgba(16, 185, 129, 0.2) !important;
             border-color: #10b981 !important;
+        }}
+
+        /* --- ULTIMATE MICRO-DENSITY DOCUMENT LIST --- */
+        .phantom-link button,
+        .phantom-link button div,
+        .phantom-link button p,
+        .phantom-link [data-testid="stButton"] button,
+        .phantom-link [data-testid="stDownloadButton"] button {{
+            background: transparent !important;
+            background-color: transparent !important;
+            background-image: none !important;
+            border: none !important;
+            border-radius: 0 !important;
+            box-shadow: none !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            min-height: 0 !important;
+            height: auto !important;
+            width: auto !important;
+            color: #38bdf8 !important;
+            text-decoration: none !important;
+            font-weight: 500 !important;
+            font-size: 0.85rem !important;
+            line-height: 1 !important;
+            display: inline-block !important;
+            text-align: left !important;
+            transition: none !important;
+        }}
+
+        .phantom-link button:hover {{
+            text-decoration: underline !important;
+            color: #ffffff !important;
+        }}
+
+        /* CRUSH THE VERTICAL GAP (THE RED HIGHLIGHTED SPACE) */
+        [data-testid="stVerticalBlock"] > div:has(.tight-row) {{
+            margin-bottom: -32px !important; /* ULTRA-AGGRESSIVE PULL-UP */
+        }}
+
+        .tight-row [data-testid="column"] {{
+            padding: 0 !important;
+            margin: 0 !important;
+            height: 16px !important; /* ABSOLUTE MINIMUM HEIGHT */
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+        }}
+
+        .tight-row [data-testid="column"]:first-child {{
+            justify-content: flex-start !important;
+        }}
+
+        /* Globally remove Streamlit gaps for these containers */
+        [data-testid="stAppViewBlockContainer"] [data-testid="stVerticalBlock"] {{
+            gap: 0 !important;
         }}
 
         /* --- Summary Metric Cards (Record Activity) --- */

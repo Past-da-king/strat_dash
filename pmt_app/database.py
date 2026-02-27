@@ -3,6 +3,7 @@ import pandas as pd
 import os
 import re
 import security
+import time
 from azure.storage.blob import BlobServiceClient
 
 # --- DATABASE CONFIG ---
@@ -182,16 +183,26 @@ def init_audit_logs_table():
             ip_address TEXT,
             session_fingerprint TEXT,
             metadata TEXT,
+            execution_time_ms INTEGER,
             created_at TEXT DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (user_id) REFERENCES users (user_id)
         )
     """)
+    
+    # Migration: Add execution_time_ms if it doesn't exist (for existing databases)
+    try:
+        cursor.execute("ALTER TABLE audit_logs ADD COLUMN execution_time_ms INTEGER")
+    except sqlite3.OperationalError:
+        # Column likely already exists
+        pass
+
     # Create indexes for better query performance
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_audit_user_id ON audit_logs(user_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_audit_event_type ON audit_logs(event_type)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_audit_category ON audit_logs(category)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_audit_created_at ON audit_logs(created_at)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_audit_session ON audit_logs(session_fingerprint)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_audit_exec_time ON audit_logs(execution_time_ms)")
     conn.commit()
     conn.close()
 
@@ -199,7 +210,7 @@ def init_audit_logs_table():
 init_audit_logs_table()
 
 
-def execute_query(query, params=(), commit=False):
+def execute_query(query, params=(), commit=False, log_it=True):
     """
     Executes a query with automatic PostgreSQL-to-SQLite translation.
     
@@ -210,6 +221,7 @@ def execute_query(query, params=(), commit=False):
         query: SQL query with %s placeholders
         params: Tuple of parameters to bind
         commit: Whether to commit the transaction
+        log_it: Whether to log performance to audit_logs
     
     Returns:
         Query results or last inserted ID
@@ -218,53 +230,62 @@ def execute_query(query, params=(), commit=False):
         ValueError: If query contains potential SQL injection patterns
     """
     # Security: Block dangerous patterns ONLY in user input context
-    # We check for patterns that indicate SQL injection via string concatenation
-    # but allow legitimate SQL keywords in proper queries
     
     query_upper = query.upper()
     
-    # Block SQL comment injection (used to bypass security)
+    # Block SQL comment injection
     if '--' in query and 'CREATE ' not in query_upper and 'INSERT ' not in query_upper:
         raise ValueError("Potentially dangerous SQL comment detected")
     
-    # Block multiple statement execution (stacked queries)
-    # Count semicolons - legitimate queries have 0 or 1 (for CREATE/INSERT)
+    # Block multiple statement execution
     if query.count(';') > 1:
         raise ValueError("Multiple SQL statements detected")
     
-    # Block dangerous extended stored procedures (SQL Server specific)
+    # Block dangerous patterns
     dangerous_patterns = ['XP_', 'SP_']
     for pattern in dangerous_patterns:
         if pattern in query_upper:
             raise ValueError(f"Potentially dangerous SQL pattern detected: {pattern}")
     
     # 1. Translate placeholders: %s -> ?
-    query = query.replace("%s", "?")
+    query_processed = query.replace("%s", "?")
 
     # 2. SQLite Compatibility: Remove 'RETURNING ...' clauses
-    # SQLite 3.35+ supports RETURNING, but python's sqlite3 driver requires
-    # fetching the result before committing, which causes the "statements in progress" error.
-    # We strip it and use cursor.lastrowid instead.
-    query = re.sub(r"\s+RETURNING\s+\w+", "", query, flags=re.IGNORECASE)
+    query_processed = re.sub(r"\s+RETURNING\s+\w+", "", query_processed, flags=re.IGNORECASE)
 
+    start_time = time.time()
     conn = get_connection()
     try:
         cursor = conn.cursor()
-        cursor.execute(query, params)
+        cursor.execute(query_processed, params)
 
         if commit:
-            last_id = cursor.lastrowid
+            result = cursor.lastrowid
             conn.commit()
-            # Only clear cache if inside a Streamlit session
             try:
                 st.cache_data.clear()
             except:
                 pass
-            return last_id
         else:
-            # Fetch everything immediately to close the result set
-            results = [dict(row) for row in cursor.fetchall()]
-            return results
+            result = [dict(row) for row in cursor.fetchall()]
+        
+        exec_time_ms = int((time.time() - start_time) * 1000)
+        
+        # Log performance (avoid recursion)
+        if log_it and "audit_logs" not in query.lower():
+            try:
+                import audit
+                audit.log_audit(
+                    event_type="SQL_QUERY",
+                    category="DATABASE",
+                    description=f"SQL Executed ({query[:50]}...)",
+                    metadata={"query": query, "params": str(params)},
+                    execution_time_ms=exec_time_ms
+                )
+            except:
+                pass
+                
+        return result
     except Exception as e:
         if commit:
             conn.rollback()
@@ -286,12 +307,18 @@ def get_df(query, params=()):
 
 def log_change(table_name, record_id, action, old_val, new_val, user_id):
     query = """
-    INSERT INTO audit_log (table_name, record_id, action, old_value, new_value, changed_by)
-    VALUES (%s, %s, %s, %s, %s, %s)
+    INSERT INTO audit_logs (event_type, category, description, metadata, user_id)
+    VALUES (%s, %s, %s, %s, %s)
     """
     execute_query(
         query,
-        (table_name, record_id, action, str(old_val), str(new_val), user_id),
+        (
+            action, 
+            "DATA_CHANGE", 
+            f"Change in {table_name} (ID: {record_id})", 
+            str({"table": table_name, "id": record_id, "old": old_val, "new": new_val}), 
+            user_id
+        ),
         commit=True,
     )
 

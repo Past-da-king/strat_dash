@@ -3,11 +3,13 @@ import pandas as pd
 import streamlit as st
 import logging
 from datetime import datetime, timedelta
+import audit
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
+@audit.track_performance(category="CALCULATION")
 @st.cache_data(ttl=600)
 def get_project_metrics(project_id):
     """
@@ -137,6 +139,7 @@ def get_category_spending(project_id):
         return pd.DataFrame(columns=["category", "total"])
 
 
+@audit.track_performance(category="PORTFOLIO")
 @st.cache_data(ttl=600)
 def get_portfolio_metrics(pm_id=None, user_id=None):
     """
@@ -225,6 +228,7 @@ def get_all_projects_summary():
         return pd.DataFrame()
 
 
+@audit.track_performance(category="BURNDOWN")
 @st.cache_data(ttl=600)
 def get_burndown_data(project_id):
     """
@@ -347,6 +351,7 @@ def get_burndown_data(project_id):
         logger.error(f"Error building burndown data for project {project_id}: {e}")
         return None
 
+@audit.track_performance(category="ACTIVITY_BURNDOWN")
 @st.cache_data(ttl=600)
 def get_activity_burndown_data(project_id):
     """
@@ -407,6 +412,7 @@ def get_activity_burndown_data(project_id):
         logger.error(f"Error calculating activity burndown: {e}")
         return None
 
+@audit.track_performance(category="NETWORK_DIAGRAM")
 def get_network_diagram_data(project_id):
     """
     Calculates the Critical Path and dependency metrics for the network diagram.

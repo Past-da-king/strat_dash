@@ -245,6 +245,10 @@ def login_view():
 
 def main():
     auth.init_session()
+    
+    # --- Track all interactions for this rerun ---
+    import audit
+    audit.track_all_interactions()
 
     import streamlit.components.v1 as components
     

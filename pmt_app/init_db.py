@@ -157,20 +157,27 @@ def init_db():
     )
     ''')
 
-    # 7. Audit Log Table
+    # 7. Audit Logs Table
     cursor.execute('''
-    CREATE TABLE IF NOT EXISTS audit_log (
-        audit_id SERIAL PRIMARY KEY,
-        table_name TEXT NOT NULL,
-        record_id INTEGER NOT NULL,
-        action TEXT NOT NULL,
-        old_value TEXT,
-        new_value TEXT,
-        changed_by INTEGER NOT NULL,
-        changed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (changed_by) REFERENCES users (user_id)
+    CREATE TABLE IF NOT EXISTS audit_logs (
+        audit_log_id SERIAL PRIMARY KEY,
+        user_id INTEGER,
+        event_type TEXT NOT NULL,
+        category TEXT NOT NULL,
+        description TEXT NOT NULL,
+        ip_address TEXT,
+        session_fingerprint TEXT,
+        metadata TEXT,
+        execution_time_ms INTEGER,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users (user_id)
     )
     ''')
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_audit_user_id ON audit_logs(user_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_audit_event_type ON audit_logs(event_type)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_audit_category ON audit_logs(category)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_audit_created_at ON audit_logs(created_at)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_audit_exec_time ON audit_logs(execution_time_ms)")
 
     # 8. Risks & Issues Table
     cursor.execute('''

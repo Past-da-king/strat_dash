@@ -301,51 +301,43 @@ def record_activity_page():
                     if not outputs.empty:
                         st.markdown('<div style="height:10px;"></div>', unsafe_allow_html=True)
                         with st.expander(f"VIEW SUBMITTED DOCUMENTS ({len(outputs)})", expanded=False, icon=":material/folder_open:"):
-                            # List links vertically for a cleaner "File Explorer" feel
+                            # List links horizontally with centering
                             for _, out in outputs.iterrows():
-                                blob_name = out['file_path']
+                                item_key = f"rec_act_{out['output_id']}"
                                 
-                                # Create download button with tracking
-                                file_downloaded = st.button(
-                                    f"📥 {out['file_name']}",
-                                    key=f"dl_act_{out['output_id']}",
-                                    help=f"Downloaded by {out['uploader_name']} on {str(out['uploaded_at'])[:10]}",
-                                    use_container_width=True
-                                )
+                                st.markdown('<div class="tight-row"></div>', unsafe_allow_html=True)
+                                r_icon, r_link, r_meta = st.columns([0.04, 0.66, 0.3])
                                 
-                                if file_downloaded:
-                                    try:
-                                        data = database.download_file_from_azure(blob_name)
-                                        
-                                        # Get file size for audit
-                                        try:
-                                            blob_client = database.get_blob_client(blob_name)
-                                            props = blob_client.get_blob_properties()
-                                            file_size = props.size
-                                        except:
-                                            file_size = len(data) if data else 0
-                                        
-                                        # AUDIT: Track download
-                                        audit.track_file_download(
-                                            file_name=out['file_name'],
-                                            file_size=file_size,
-                                            file_type=out['file_name'].rsplit('.', 1)[-1] if '.' in out['file_name'] else 'unknown',
-                                            location="record_activity",
-                                            file_id=out['output_id'],
-                                            project_id=None  # Will be determined from activity
-                                        )
-                                        
-                                        # Provide download
+                                with r_icon:
+                                    icon = "fa-file-pdf" if out['file_name'].endswith('.pdf') else "fa-file-alt"
+                                    st.markdown(f'<div style="display:flex; align-items:center; height:100%;"><i class="fas {icon}" style="color:#94a3b8; font-size: 0.75rem;"></i></div>', unsafe_allow_html=True)
+                                
+                                with r_link:
+                                    st.markdown('<div class="phantom-link" style="display:flex; align-items:center; height:100%;">', unsafe_allow_html=True)
+                                    # Lazy Fetch Link
+                                    if not st.session_state.get(f"ready_{item_key}"):
+                                        if st.button(out['file_name'], key=f"trig_{item_key}", use_container_width=False):
+                                            with st.spinner("..."):
+                                                data = database.download_file_from_azure(out['file_path'])
+                                                st.session_state[f"data_{item_key}"] = data
+                                                st.session_state[f"ready_{item_key}"] = True
+                                                st.rerun()
+                                    
+                                    # Final Download Link
+                                    if st.session_state.get(f"ready_{item_key}"):
                                         st.download_button(
-                                            label="💾 Click to Save",
-                                            data=data,
+                                            label=out['file_name'],
+                                            data=st.session_state[f"data_{item_key}"],
                                             file_name=out['file_name'],
                                             mime="application/octet-stream",
-                                            key=f"save_{out['output_id']}",
-                                            use_container_width=True
+                                            key=f"act_{item_key}"
                                         )
-                                    except Exception as e:
-                                        st.error(f"Download failed: {str(e)}")
+                                    st.markdown('</div>', unsafe_allow_html=True)
+
+                                with r_meta:
+                                    st.markdown(f'<div style="font-size: 0.7rem; color: #64748b; text-align: right; width: 100%; white-space: nowrap; display:flex; align-items:center; justify-content:flex-end; height:100%;">By {out["uploader_name"]} on {str(out["uploaded_at"])[:10]}</div>', unsafe_allow_html=True)
+                                
+                                st.markdown('<div style="border-bottom: 1px solid rgba(255,255,255,0.02); margin-top: -2px;"></div>', unsafe_allow_html=True)
             
             st.markdown('<div style="height:5px;"></div>', unsafe_allow_html=True)
 

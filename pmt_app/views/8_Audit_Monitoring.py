@@ -116,12 +116,13 @@ def audit_dashboard_page():
     # =========================================================================
     # TABS FOR DIFFERENT VIEWS
     # =========================================================================
-    tab1, tab2, tab3, tab4, tab5 = st.tabs([
+    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
         "📊 Activity Overview",
         "👥 User Activity",
         "📁 File Operations",
         "⏱️ Session Analysis",
-        "📋 Audit Logs"
+        "📋 Audit Logs",
+        "⚡ Performance & Health"
     ])
 
     # =========================================================================
@@ -363,7 +364,7 @@ def audit_dashboard_page():
         st.markdown(f"#### Showing {len(filtered_df)} events")
         
         # Format for display
-        display_cols = ['created_at', 'full_name', 'username', 'event_type', 'category', 'description', 'ip_address']
+        display_cols = ['created_at', 'full_name', 'event_type', 'category', 'description', 'execution_time_ms', 'ip_address']
         available_cols = [c for c in display_cols if c in filtered_df.columns]
         
         st.dataframe(
@@ -373,10 +374,13 @@ def audit_dashboard_page():
             column_config={
                 "created_at": "Timestamp",
                 "full_name": "User",
-                "username": "Username",
                 "event_type": "Event",
                 "category": "Category",
                 "description": "Description",
+                "execution_time_ms": st.column_config.NumberColumn(
+                    "Time (ms)",
+                    format="%d ms"
+                ),
                 "ip_address": "IP Address"
             }
         )
@@ -391,6 +395,52 @@ def audit_dashboard_page():
                 mime="text/csv",
                 use_container_width=True
             )
+
+    # =========================================================================
+    # TAB 6: PERFORMANCE & HEALTH (NEW)
+    # =========================================================================
+    with tab6:
+        st.markdown("### System Performance & Health")
+        
+        if not recent_df.empty and 'execution_time_ms' in recent_df.columns:
+            perf_df = recent_df[recent_df['execution_time_ms'].notna()]
+            
+            if not perf_df.empty:
+                p1, p2, p3 = st.columns(3)
+                p1.metric("Avg Execution Time", f"{perf_df['execution_time_ms'].mean():.1f}ms")
+                p2.metric("Max Execution Time", f"{perf_df['execution_time_ms'].max():.0f}ms")
+                p3.metric("Slow Ops (>500ms)", len(perf_df[perf_df['execution_time_ms'] > 500]))
+                
+                # Slowest Operations Chart
+                st.markdown("#### Top 10 Slowest Operations")
+                slowest = perf_df.nlargest(10, 'execution_time_ms')
+                fig_slow = px.bar(
+                    slowest,
+                    x='execution_time_ms',
+                    y='description',
+                    orientation='h',
+                    color='category',
+                    title='Slowest System Operations',
+                    labels={'execution_time_ms': 'Time (ms)', 'description': 'Operation'}
+                )
+                st.plotly_chart(fig_slow, use_container_width=True)
+                
+                # Failures and Exceptions
+                st.markdown("#### System Failures & Exceptions")
+                failure_df = recent_df[recent_df['event_type'].isin(['FAILURE', 'EXCEPTION'])]
+                if not failure_df.empty:
+                    st.warning(f"Detected {len(failure_df)} failures/exceptions in the selected period.")
+                    st.dataframe(
+                        failure_df[['created_at', 'event_type', 'category', 'description', 'metadata']],
+                        use_container_width=True,
+                        hide_index=True
+                    )
+                else:
+                    st.success("No system failures detected in this period.")
+            else:
+                st.info("No performance metrics captured yet.")
+        else:
+            st.info("Performance tracking is initializing...")
 
 if __name__ == "__main__":
     audit_dashboard_page()

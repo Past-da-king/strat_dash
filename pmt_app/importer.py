@@ -1,7 +1,9 @@
 import pandas as pd
 import database
 from datetime import datetime
+import audit
 
+@audit.track_performance(category="IMPORT")
 def import_project(file, user_id):
     """
     Parses the Project Template Excel and inserts data into the DB.

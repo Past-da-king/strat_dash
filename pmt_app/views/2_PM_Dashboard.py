@@ -336,49 +336,40 @@ def pm_dashboard():
     @st.dialog("All Task Deliverables", width="large")
     def show_full_deliverables(all_outputs):
         st.markdown("### Project Output Inventory")
-        st.info("Click on a file name to download it directly.")
+        st.info("Click a file name to fetch it from storage, then click Save to download.")
 
         for _, out in all_outputs.iterrows():
             uploaded_date = str(out['uploaded_at'])[:10] if pd.notna(out['uploaded_at']) else 'N/A'
+            item_key = f"full_dl_{out['output_id']}"
 
             with st.container(border=True):
                 c1, c2, c3 = st.columns([2, 2, 1])
                 with c1:
                     st.markdown(f"**Task**: {out['activity_name']}")
                 with c2:
-                    # Download button with tracking
-                    if st.button(f"📥 {out['file_name']}", key=f"dl_pm_{out['output_id']}", use_container_width=True):
-                        try:
-                            data = database.download_file_from_azure(out['file_path'])
-                            
-                            # Get file size for audit
-                            try:
-                                blob_client = database.get_blob_client(out['file_path'])
-                                props = blob_client.get_blob_properties()
-                                file_size = props.size
-                            except:
-                                file_size = len(data) if data else 0
-                            
-                            # AUDIT: Track download
-                            audit.track_file_download(
-                                file_name=out['file_name'],
-                                file_size=file_size,
-                                file_type=out['file_name'].rsplit('.', 1)[-1] if '.' in out['file_name'] else 'unknown',
-                                location="pm_dashboard",
-                                file_id=out['output_id']
-                            )
-                            
-                            # Provide download
-                            st.download_button(
-                                label="💾 Save File",
-                                data=data,
-                                file_name=out['file_name'],
-                                mime="application/octet-stream",
-                                key=f"save_{out['output_id']}",
-                                use_container_width=True
-                            )
-                        except Exception as e:
-                            st.error(f"Download failed: {str(e)}")
+                    st.markdown('<div class="phantom-link">', unsafe_allow_html=True)
+                    # Lazy Fetch Logic
+                    if not st.session_state.get(f"ready_{item_key}"):
+                        if st.button(out['file_name'], key=f"trig_{item_key}", use_container_width=False):
+                            with st.spinner("Fetching bytes..."):
+                                data = database.download_file_from_azure(out['file_path'])
+                                st.session_state[f"data_{item_key}"] = data
+                                st.session_state[f"ready_{item_key}"] = True
+                                st.rerun()
+                    
+                    if st.session_state.get(f"ready_{item_key}"):
+                        st.download_button(
+                            label=f"💾 Save {out['file_name']}",
+                            data=st.session_state[f"data_{item_key}"],
+                            file_name=out['file_name'],
+                            mime="application/octet-stream",
+                            key=f"act_{item_key}"
+                        )
+                        if st.button("Reset", key=f"res_{item_key}"):
+                            del st.session_state[f"ready_{item_key}"]
+                            del st.session_state[f"data_{item_key}"]
+                            st.rerun()
+                    st.markdown('</div>', unsafe_allow_html=True)
                 with c3:
                     st.caption(f"By {out['uploader_name']} on {uploaded_date}")
 
@@ -647,7 +638,7 @@ def pm_dashboard():
     # --- ROW 5: TASK DELIVERABLES ---
     col_dl_h, col_dl_b = st.columns([3, 1])
     with col_dl_h: st.markdown("### <i class='fas fa-paperclip fa-icon'></i> Task Deliverables", unsafe_allow_html=True)
-    
+
     all_outputs = database.get_all_outputs_for_project(project_id)
 
     if not all_outputs.empty:
@@ -656,56 +647,46 @@ def pm_dashboard():
             if st.button("Full View", key="btn_full_dl", use_container_width=True): show_full_deliverables(all_outputs)
             st.markdown('</div>', unsafe_allow_html=True)
 
-        # Show first 4 outputs with tracked downloads
+        # Simple header for the list
+        st.markdown(f'<div style="display:flex; padding:8px 0; border-bottom:2px solid rgba(128, 128, 128, 0.2); margin-bottom:4px;"><span style="flex:2; font-size:0.75rem; opacity:0.8; font-weight:600; text-transform:uppercase;">Task</span><span style="flex:2; font-size:0.75rem; opacity:0.8; font-weight:600; text-transform:uppercase;">Output File (Click to Download)</span><span style="flex:1; font-size:0.75rem; opacity:0.8; font-weight:600; text-transform:uppercase;">By</span><span style="flex:1; font-size:0.75rem; opacity:0.8; font-weight:600; text-transform:uppercase;">Date</span></div>', unsafe_allow_html=True)
+
+        # Show first 4 outputs
         for _, out in all_outputs.head(4).iterrows():
             uploaded_date = str(out['uploaded_at'])[:10] if pd.notna(out['uploaded_at']) else 'N/A'
+            item_key = f"dash_dl_{out['output_id']}"
             
-            with st.container(border=True):
-                dl_c1, dl_c2, dl_c3 = st.columns([2, 2, 1])
-                with dl_c1:
-                    st.caption(f"**{out['activity_name']}**")
-                with dl_c2:
-                    # Download button with tracking
-                    if st.button(f"📥 {out['file_name']}", key=f"dl_pm_list_{out['output_id']}", use_container_width=True):
-                        try:
+            # Use 'tight-row' for vertical compression and columns for layout
+            st.markdown(f'<div class="tight-row"></div>', unsafe_allow_html=True)
+            r_c1, r_c2, r_c3, r_c4 = st.columns([2.5, 3.5, 1, 1])
+            
+            with r_c1:
+                st.markdown(f"<div style='font-weight:500; font-size:0.8rem; display:flex; align-items:center;'>{out['activity_name']}</div>", unsafe_allow_html=True)
+            
+            with r_c2:
+                # Center the download link column
+                st.markdown('<div class="phantom-link" style="display:flex; justify-content:center; width:100%;">', unsafe_allow_html=True)
+                if not st.session_state.get(f"ready_{item_key}"):
+                    if st.button(out['file_name'], key=f"trigger_{item_key}", use_container_width=False):
+                        with st.spinner("..."):
                             data = database.download_file_from_azure(out['file_path'])
-                            
-                            # Get file size
-                            try:
-                                blob_client = database.get_blob_client(out['file_path'])
-                                props = blob_client.get_blob_properties()
-                                file_size = props.size
-                            except:
-                                file_size = len(data) if data else 0
-                            
-                            # AUDIT: Track download
-                            audit.track_file_download(
-                                file_name=out['file_name'],
-                                file_size=file_size,
-                                file_type=out['file_name'].rsplit('.', 1)[-1] if '.' in out['file_name'] else 'unknown',
-                                location="pm_dashboard_list",
-                                file_id=out['output_id']
-                            )
-                            
-                            # Provide download
-                            st.download_button(
-                                label="💾 Save",
-                                data=data,
-                                file_name=out['file_name'],
-                                mime="application/octet-stream",
-                                key=f"save_pm_{out['output_id']}",
-                                use_container_width=True
-                            )
-                        except Exception as e:
-                            st.error(f"Download failed: {str(e)}")
-                with dl_c3:
-                    st.caption(f"{out['uploader_name']}\n\n{uploaded_date}")
-        
-        deliverables_html += '</div>'
-        st.markdown(deliverables_html, unsafe_allow_html=True)
+                            st.session_state[f"data_{item_key}"] = data
+                            st.session_state[f"ready_{item_key}"] = True
+                            st.rerun()
+                
+                if st.session_state.get(f"ready_{item_key}"):
+                    st.download_button(label=out['file_name'], data=st.session_state[f"data_{item_key}"], file_name=out['file_name'], key=f"actual_{item_key}")
+                st.markdown('</div>', unsafe_allow_html=True)
+            
+            with r_c3:
+                st.markdown(f"<div style='font-size:0.75rem; opacity:0.7; display:flex; align-items:center; justify-content:center; width:100%;'>{out['uploader_name']}</div>", unsafe_allow_html=True)
+            with r_c4:
+                st.markdown(f"<div style='font-size:0.75rem; opacity:0.7; display:flex; align-items:center; justify-content:center; width:100%;'>{uploaded_date}</div>", unsafe_allow_html=True)
+            
+            # Subtle line
+            st.markdown('<div style="border-bottom: 1px solid rgba(255,255,255,0.05); margin-top: -2px;"></div>', unsafe_allow_html=True)
     else:
         st.info("No deliverables uploaded yet. Outputs will appear here once tasks are marked as complete with uploaded files.")
-
+    
     st.markdown('<div style="height:30px"></div>', unsafe_allow_html=True)
 
     # --- ROW 6: RISK REGISTER ---

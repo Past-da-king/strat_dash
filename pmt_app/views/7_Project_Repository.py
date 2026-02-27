@@ -284,7 +284,41 @@ def project_repository_page():
                                 st.rerun()
                             st.markdown('</div>', unsafe_allow_html=True)
                         else:
-                            st.markdown(f'<div style="font-weight:400; font-size:1.0rem;">{item["name"]}</div>', unsafe_allow_html=True)
+                            # Download trigger styled as a text link
+                            st.markdown('<div class="text-link-container">', unsafe_allow_html=True)
+                            if st.button(item['name'], key=f"dl_repo_name_{item['file_id']}", use_container_width=False):
+                                try:
+                                    data = database.download_file_from_azure(item['file_path'])
+                                    
+                                    # Get file size for audit
+                                    try:
+                                        blob_client = database.get_blob_client(item['file_path'])
+                                        props = blob_client.get_blob_properties()
+                                        file_size = props.size
+                                    except:
+                                        file_size = len(data)
+                                    
+                                    # AUDIT: Track download
+                                    audit.track_file_download(
+                                        file_name=item['name'],
+                                        file_size=file_size,
+                                        file_type=item['name'].rsplit('.', 1)[-1] if '.' in item['name'] else 'unknown',
+                                        location="repository",
+                                        file_id=item['file_id'],
+                                        project_id=project_id
+                                    )
+                                    
+                                    st.download_button(
+                                        label="Click to Save to Device",
+                                        data=data,
+                                        file_name=item['name'],
+                                        mime="application/octet-stream",
+                                        key=f"save_repo_{item['file_id']}",
+                                        use_container_width=True
+                                    )
+                                except Exception as e:
+                                    st.error(f"Download failed: {str(e)}")
+                            st.markdown('</div>', unsafe_allow_html=True)
 
                     # 3. Date
                     with r3:
@@ -378,71 +412,44 @@ def project_repository_page():
 
                 with st.expander(f"Task: {act['activity_name']}", expanded=True):
                     for _, out in outputs.iterrows():
+                        item_key = f"repo_act_{out['output_id']}"
                         ar1, ar2, ar3 = st.columns([0.4, 8.6, 1])
                         with ar1: st.markdown(f'<div style="margin-top: 5px;">{get_icon(out["file_name"])}</div>', unsafe_allow_html=True)
                         with ar2:
-                            st.markdown(f"**{out['file_name']}**")
+                            st.markdown('<div class="phantom-link">', unsafe_allow_html=True)
+                            # Step 1: Initial Trigger
+                            if not st.session_state.get(f"ready_{item_key}"):
+                                if st.button(out['file_name'], key=f"trig_{item_key}", use_container_width=False):
+                                    with st.spinner("Fetching..."):
+                                        data = database.download_file_from_azure(out['file_path'])
+                                        st.session_state[f"data_{item_key}"] = data
+                                        st.session_state[f"ready_{item_key}"] = True
+                                        st.rerun()
+                            
+                            # Step 2: Download Link
+                            if st.session_state.get(f"ready_{item_key}"):
+                                st.download_button(
+                                    label=f"💾 Save {out['file_name']}",
+                                    data=st.session_state[f"data_{item_key}"],
+                                    file_name=out['file_name'],
+                                    mime="application/octet-stream",
+                                    key=f"act_{item_key}"
+                                )
+                                if st.button("Reset", key=f"res_{item_key}"):
+                                    del st.session_state[f"ready_{item_key}"]
+                                    del st.session_state[f"data_{item_key}"]
+                                    st.rerun()
+                            st.markdown('</div>', unsafe_allow_html=True)
+                            
                             st.caption(f"Uploaded by {out['uploader_name']} on {str(out['uploaded_at'])[:10]}")
                         with ar3:
                             with st.popover("⋮", icon=None, help="Options", use_container_width=True):
-                                # Download button - LAZY LOADING
-                                st.markdown('<div class="download-btn">', unsafe_allow_html=True)
-                                if st.button("⬇️ Download", key=f"dl_btn_act_{out['output_id']}", use_container_width=True):
-                                    st.session_state[f"download_file_act_{out['output_id']}"] = True
-                                
-                                # Handle download only when requested
-                                if st.session_state.get(f"download_file_act_{out['output_id']}"):
-                                    try:
-                                        with st.spinner(f"Downloading {out['file_name']}..."):
-                                            data = database.download_file_from_azure(out['file_path'])
-                                            
-                                            # Get file size for audit
-                                            try:
-                                                blob_client = database.get_blob_client(out['file_path'])
-                                                props = blob_client.get_blob_properties()
-                                                file_size = props.size
-                                            except:
-                                                file_size = len(data)
-                                            
-                                            # AUDIT: Track download
-                                            audit.track_file_download(
-                                                file_name=out['file_name'],
-                                                file_size=file_size,
-                                                file_type=out['file_name'].rsplit('.', 1)[-1] if '.' in out['file_name'] else 'unknown',
-                                                location="activity_output",
-                                                file_id=out['output_id'],
-                                                project_id=project_id
-                                            )
-                                            
-                                            st.download_button(
-                                                label="📥 Click to Save",
-                                                data=data,
-                                                file_name=out['file_name'],
-                                                mime="application/octet-stream",
-                                                key=f"actual_dl_act_{out['output_id']}",
-                                                use_container_width=True
-                                            )
-                                    except Exception as e:
-                                        st.error(f"Download failed: {str(e)}")
-                                    finally:
-                                        del st.session_state[f"download_file_act_{out['output_id']}"]
-                                st.markdown('</div>', unsafe_allow_html=True)
-
                                 # Delete Action
                                 st.markdown('<div class="danger-btn">', unsafe_allow_html=True)
                                 if st.button("🗑️ Delete", key=f"del_act_{out['output_id']}", use_container_width=True):
                                     database.delete_task_output(out['output_id'])
                                     st.rerun()
                                 st.markdown('</div>', unsafe_allow_html=True)
-                                
-                                # Show file size
-                                try:
-                                    blob_client = database.get_blob_client(out['file_path'])
-                                    props = blob_client.get_blob_properties()
-                                    size_mb = props.size / (1024 * 1024)
-                                    st.caption(f"📦 {size_mb:.1f} MB")
-                                except:
-                                    st.caption("Size unknown")
                                 
                                 render_linked_context('A', out['output_id'])
 
@@ -465,69 +472,42 @@ def project_repository_page():
                         kr1, kr2, kr3 = st.columns([0.4, 8.6, 1])
                         with kr1: st.markdown(f'<div style="margin-top: 5px;">{get_icon(fname)}</div>', unsafe_allow_html=True)
                         with kr2:
-                            st.markdown(f"**{fname}**")
+                            item_key = f"repo_risk_{r['risk_id']}_{hash(p)}"
+                            st.markdown('<div class="phantom-link">', unsafe_allow_html=True)
+                            # Step 1: Initial Trigger
+                            if not st.session_state.get(f"ready_{item_key}"):
+                                if st.button(fname, key=f"trig_{item_key}", use_container_width=False):
+                                    with st.spinner("Fetching..."):
+                                        data = database.download_file_from_azure(p)
+                                        st.session_state[f"data_{item_key}"] = data
+                                        st.session_state[f"ready_{item_key}"] = True
+                                        st.rerun()
+                            
+                            # Step 2: Download Link
+                            if st.session_state.get(f"ready_{item_key}"):
+                                st.download_button(
+                                    label=f"💾 Save {fname}",
+                                    data=st.session_state[f"data_{item_key}"],
+                                    file_name=fname,
+                                    mime="application/octet-stream",
+                                    key=f"act_{item_key}"
+                                )
+                                if st.button("Reset", key=f"res_{item_key}"):
+                                    del st.session_state[f"ready_{item_key}"]
+                                    del st.session_state[f"data_{item_key}"]
+                                    st.rerun()
+                            st.markdown('</div>', unsafe_allow_html=True)
+                                
                             if r['activity_id']:
                                 st.markdown(f'<div style="font-size: 0.7rem; color: #38bdf8;"><i class="fas fa-link"></i> Task: {r["activity_name"]}</div>', unsafe_allow_html=True)
                         with kr3:
                             with st.popover("⋮", icon=None, help="Options", use_container_width=True):
-                                # Download button - LAZY LOADING
-                                st.markdown('<div class="download-btn">', unsafe_allow_html=True)
-                                if st.button("⬇️ Download", key=f"dl_btn_risk_{r['risk_id']}_{hash(p)}", use_container_width=True):
-                                    st.session_state[f"download_file_risk_{r['risk_id']}_{hash(p)}"] = True
-                                
-                                # Handle download only when requested
-                                if st.session_state.get(f"download_file_risk_{r['risk_id']}_{hash(p)}"):
-                                    try:
-                                        with st.spinner(f"Downloading {fname}..."):
-                                            data = database.download_file_from_azure(p)
-                                            
-                                            # Get file size for audit
-                                            try:
-                                                blob_client = database.get_blob_client(p)
-                                                props = blob_client.get_blob_properties()
-                                                file_size = props.size
-                                            except:
-                                                file_size = len(data)
-                                            
-                                            # AUDIT: Track download
-                                            audit.track_file_download(
-                                                file_name=fname,
-                                                file_size=file_size,
-                                                file_type=fname.rsplit('.', 1)[-1] if '.' in fname else 'unknown',
-                                                location="risk_proof",
-                                                file_id=r['risk_id'],
-                                                project_id=project_id
-                                            )
-                                            
-                                            st.download_button(
-                                                label="📥 Click to Save",
-                                                data=data,
-                                                file_name=fname,
-                                                mime="application/octet-stream",
-                                                key=f"actual_dl_risk_{r['risk_id']}_{hash(p)}",
-                                                use_container_width=True
-                                            )
-                                    except Exception as e:
-                                        st.error(f"Download failed: {str(e)}")
-                                    finally:
-                                        del st.session_state[f"download_file_risk_{r['risk_id']}_{hash(p)}"]
-                                st.markdown('</div>', unsafe_allow_html=True)
-
                                 # Delete Action
                                 st.markdown('<div class="danger-btn">', unsafe_allow_html=True)
                                 if st.button("🗑️ Delete", key=f"del_risk_{r['risk_id']}_{hash(p)}", use_container_width=True):
                                     database.remove_risk_closure_file(r['risk_id'], p)
                                     st.rerun()
                                 st.markdown('</div>', unsafe_allow_html=True)
-                                
-                                # Show file size
-                                try:
-                                    blob_client = database.get_blob_client(p)
-                                    props = blob_client.get_blob_properties()
-                                    size_mb = props.size / (1024 * 1024)
-                                    st.caption(f"📦 {size_mb:.1f} MB")
-                                except:
-                                    st.caption("Size unknown")
                                 
                                 render_linked_context('K', r['risk_id'])
 

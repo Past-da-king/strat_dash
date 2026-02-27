@@ -8,6 +8,107 @@ from datetime import datetime
 import database
 import hashlib
 import socket
+import functools
+import traceback
+import time
+
+
+# =============================================================================
+# DECORATORS
+# =============================================================================
+
+def track_performance(category="PERFORMANCE"):
+    """Decorator to track execution time and status of a function."""
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            start_time = time.time()
+            try:
+                result = func(*args, **kwargs)
+                exec_time_ms = int((time.time() - start_time) * 1000)
+                log_audit(
+                    event_type="PERFORMANCE",
+                    category=category,
+                    description=f"Executed {func.__name__}",
+                    metadata={"function": func.__name__, "status": "success"},
+                    execution_time_ms=exec_time_ms
+                )
+                return result
+            except Exception as e:
+                exec_time_ms = int((time.time() - start_time) * 1000)
+                log_audit(
+                    event_type="FAILURE",
+                    category=category,
+                    description=f"Failed {func.__name__}: {str(e)}",
+                    metadata={
+                        "function": func.__name__,
+                        "status": "error",
+                        "error": str(e),
+                        "stack_trace": traceback.format_exc()
+                    },
+                    execution_time_ms=exec_time_ms
+                )
+                raise e
+        return wrapper
+    return decorator
+
+
+def catch_and_log(category="SYSTEM"):
+    """Decorator to catch exceptions and log them without necessarily stopping execution."""
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            try:
+                return func(*args, **kwargs)
+            except Exception as e:
+                log_audit(
+                    event_type="EXCEPTION",
+                    category=category,
+                    description=f"Exception in {func.__name__}: {str(e)}",
+                    metadata={
+                        "function": func.__name__,
+                        "error": str(e),
+                        "stack_trace": traceback.format_exc()
+                    },
+                )
+                raise e
+        return wrapper
+    return decorator
+
+
+def track_all_interactions():
+    """
+    Attempts to identify which widget triggered the current rerun and logs it.
+    Uses Streamlit's context to find triggered widgets.
+    """
+    try:
+        # Access the triggered widgets from the current context
+        # This is available in newer Streamlit versions (1.34+)
+        triggered = getattr(st.context, "triggered_batch", [])
+        if not triggered:
+            # Fallback for older context access or single trigger
+            trig = getattr(st.context, "triggered", None)
+            triggered = [trig] if trig else []
+
+        for item in triggered:
+            # Only log if it has a key (manual interaction)
+            if item.key:
+                # Avoid logging internal or redundant keys
+                if item.key.startswith("_") or "csrf" in item.key.lower():
+                    continue
+                    
+                log_audit(
+                    event_type="INTERACTION",
+                    category="NAVIGATION" if "nav" in item.key.lower() else "UI",
+                    description=f"User interacted with: {item.key}",
+                    metadata={
+                        "key": item.key, 
+                        "value": str(item.value)[:100] # Truncate large values
+                    }
+                )
+    except Exception as e:
+        # Don't fail the app if interaction tracking fails
+        pass
 
 
 # =============================================================================
@@ -49,7 +150,7 @@ def get_ip_address() -> str:
 
 
 def log_audit(event_type: str, category: str, description: str, 
-              metadata: dict = None, user_id: int = None):
+              metadata: dict = None, user_id: int = None, execution_time_ms: int = None):
     """
     Log an audit event to the database.
     
@@ -59,9 +160,11 @@ def log_audit(event_type: str, category: str, description: str,
         description: Human-readable description
         metadata: Additional data as dict (will be stored as JSON string)
         user_id: User ID (defaults to current user)
+        execution_time_ms: Performance metric in milliseconds
     """
     try:
         if user_id is None:
+            import auth
             user = auth.get_current_user()
             user_id = user.get('id') if user else None
         
@@ -75,8 +178,8 @@ def log_audit(event_type: str, category: str, description: str,
         # Insert audit log
         query = """
         INSERT INTO audit_logs 
-        (user_id, event_type, category, description, ip_address, session_fingerprint, metadata, created_at)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+        (user_id, event_type, category, description, ip_address, session_fingerprint, metadata, execution_time_ms, created_at)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
         """
         
         database.execute_query(query, (
@@ -87,6 +190,7 @@ def log_audit(event_type: str, category: str, description: str,
             ip_address,
             fingerprint,
             metadata_str,
+            execution_time_ms,
             datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         ), commit=True)
         
@@ -160,6 +264,7 @@ def track_page_view(page_name: str, page_path: str = None):
         page_name: Human-readable page name
         page_path: Optional page path/file
     """
+    import auth
     user = auth.get_current_user()
     if not user:
         return
@@ -446,5 +551,4 @@ def get_recent_activity(limit: int = 100):
     return database.get_df(query)
 
 
-# Import auth at the end to avoid circular imports
-import auth
+# Import auth removed to avoid circular dependencies. Functions now import it locally.
