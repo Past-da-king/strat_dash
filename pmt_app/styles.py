@@ -387,15 +387,15 @@ def global_css():
             color: #ffffff !important;
         }}
 
-        /* CRUSH THE VERTICAL GAP (THE RED HIGHLIGHTED SPACE) */
-        [data-testid="stVerticalBlock"] > div:has(.tight-row) {{
-            margin-bottom: -32px !important; /* ULTRA-AGGRESSIVE PULL-UP */
+        /* Ssurgical Vertical Compression for Lists */
+        .tight-list [data-testid="stVerticalBlock"] > div {{
+            margin-bottom: -30px !important; /* Pull up rows ONLY inside tight-list */
         }}
 
         .tight-row [data-testid="column"] {{
             padding: 0 !important;
             margin: 0 !important;
-            height: 16px !important; /* ABSOLUTE MINIMUM HEIGHT */
+            height: 18px !important; 
             display: flex !important;
             align-items: center !important;
             justify-content: center !important;
@@ -405,9 +405,10 @@ def global_css():
             justify-content: flex-start !important;
         }}
 
-        /* Globally remove Streamlit gaps for these containers */
-        [data-testid="stAppViewBlockContainer"] [data-testid="stVerticalBlock"] {{
-            gap: 0 !important;
+        /* Restore space between main containers/cards */
+        [data-testid="stVerticalBlockBorderWrapper"] {{
+            margin-bottom: 1.5rem !important;
+            padding: 1.2rem !important;
         }}
 
         /* --- Summary Metric Cards (Record Activity) --- */

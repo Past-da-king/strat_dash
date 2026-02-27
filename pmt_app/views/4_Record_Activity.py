@@ -301,6 +301,8 @@ def record_activity_page():
                     if not outputs.empty:
                         st.markdown('<div style="height:10px;"></div>', unsafe_allow_html=True)
                         with st.expander(f"VIEW SUBMITTED DOCUMENTS ({len(outputs)})", expanded=False, icon=":material/folder_open:"):
+                            # Start tight-list
+                            st.markdown('<div class="tight-list">', unsafe_allow_html=True)
                             # List links horizontally with centering
                             for _, out in outputs.iterrows():
                                 item_key = f"rec_act_{out['output_id']}"
@@ -338,6 +340,7 @@ def record_activity_page():
                                     st.markdown(f'<div style="font-size: 0.7rem; color: #64748b; text-align: right; width: 100%; white-space: nowrap; display:flex; align-items:center; justify-content:flex-end; height:100%;">By {out["uploader_name"]} on {str(out["uploaded_at"])[:10]}</div>', unsafe_allow_html=True)
                                 
                                 st.markdown('<div style="border-bottom: 1px solid rgba(255,255,255,0.02); margin-top: -2px;"></div>', unsafe_allow_html=True)
+                            st.markdown('</div>', unsafe_allow_html=True) # End tight-list
             
             st.markdown('<div style="height:5px;"></div>', unsafe_allow_html=True)
 

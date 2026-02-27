@@ -647,6 +647,8 @@ def pm_dashboard():
             if st.button("Full View", key="btn_full_dl", use_container_width=True): show_full_deliverables(all_outputs)
             st.markdown('</div>', unsafe_allow_html=True)
 
+        # Use the tight-list marker for surgical CSS control
+        st.markdown('<div class="tight-list">', unsafe_allow_html=True)
         # Simple header for the list
         st.markdown(f'<div style="display:flex; padding:8px 0; border-bottom:2px solid rgba(128, 128, 128, 0.2); margin-bottom:4px;"><span style="flex:2; font-size:0.75rem; opacity:0.8; font-weight:600; text-transform:uppercase;">Task</span><span style="flex:2; font-size:0.75rem; opacity:0.8; font-weight:600; text-transform:uppercase;">Output File (Click to Download)</span><span style="flex:1; font-size:0.75rem; opacity:0.8; font-weight:600; text-transform:uppercase;">By</span><span style="flex:1; font-size:0.75rem; opacity:0.8; font-weight:600; text-transform:uppercase;">Date</span></div>', unsafe_allow_html=True)
 
@@ -655,7 +657,7 @@ def pm_dashboard():
             uploaded_date = str(out['uploaded_at'])[:10] if pd.notna(out['uploaded_at']) else 'N/A'
             item_key = f"dash_dl_{out['output_id']}"
             
-            # Use 'tight-row' for vertical compression and columns for layout
+            # The 'tight-row' class triggers the Absolute Zero spacing in styles.py
             st.markdown(f'<div class="tight-row"></div>', unsafe_allow_html=True)
             r_c1, r_c2, r_c3, r_c4 = st.columns([2.5, 3.5, 1, 1])
             
@@ -684,6 +686,7 @@ def pm_dashboard():
             
             # Subtle line
             st.markdown('<div style="border-bottom: 1px solid rgba(255,255,255,0.05); margin-top: -2px;"></div>', unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True) # Close tight-list
     else:
         st.info("No deliverables uploaded yet. Outputs will appear here once tasks are marked as complete with uploaded files.")
     

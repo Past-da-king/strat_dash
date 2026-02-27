@@ -77,8 +77,8 @@ def _is_safe_blob_name(blob_name: str) -> bool:
     if len(blob_name) > 256:
         return False
     
-    # Check for allowed characters (alphanumeric, /, -, _, .)
-    if not re.match(r'^[a-zA-Z0-9/\-_.]+$', blob_name):
+    # Check for allowed characters (alphanumeric, /, -, _, ., and spaces)
+    if not re.match(r'^[a-zA-Z0-9/\-_. ]+$', blob_name):
         return False
     
     return True
